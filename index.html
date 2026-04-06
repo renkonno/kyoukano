@@ -775,7 +775,7 @@ function renderCal(){
     const opacity=isPast?'0.3':''
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
-    const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'承認済':'却下'):''
+    const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'出勤':'却下'):''
     const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusText?`<span style="font-size:.4rem;line-height:1.1">${statusText}</span>`:''}</div>`
     html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
@@ -1405,19 +1405,24 @@ async function openInactiveSheet(){
 
 async function deleteCast(castId, name){
   if(!confirm(name+'を完全に消去しますか？\nこの操作は取り消せません。シフト・委託金記録も全て削除されます。')) return
-  // 関連データを削除
-  const r1=await sb.from('cast_fees').delete().eq('cast_id',castId)
-  const r2=await sb.from('cast_discounts').delete().eq('cast_id',castId)
-  const r3=await sb.from('shifts').delete().eq('cast_id',castId)
-  const r4=await sb.from('works').delete().eq('cast_id',castId)
-  const{error}=await sb.from('casts').delete().eq('id',castId)
-  if(error){
-    alert('エラー: '+error.message)
-    return
+  try {
+    // 関連データを順番に削除（外部キー制約を考慮）
+    const r1=await sb.from('works').delete().eq('cast_id',castId)
+    if(r1.error) throw new Error('works削除エラー: '+r1.error.message)
+    const r2=await sb.from('shifts').delete().eq('cast_id',castId)
+    if(r2.error) throw new Error('shifts削除エラー: '+r2.error.message)
+    const r3=await sb.from('cast_discounts').delete().eq('cast_id',castId)
+    if(r3.error) throw new Error('discounts削除エラー: '+r3.error.message)
+    const r4=await sb.from('cast_fees').delete().eq('cast_id',castId)
+    if(r4.error) throw new Error('fees削除エラー: '+r4.error.message)
+    const r5=await sb.from('casts').delete().eq('id',castId)
+    if(r5.error) throw new Error('cast削除エラー: '+r5.error.message)
+    toast(name+'を完全消去しました')
+    openInactiveSheet()
+    init()
+  } catch(e) {
+    alert(e.message)
   }
-  toast(name+'を完全消去しました')
-  openInactiveSheet()
-  init()
 }
 
 async function openAddCast(){
