@@ -49,11 +49,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 /* TAB BAR */
 .tbar{display:flex;background:var(--surface);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;z-index:50;padding-bottom:env(safe-area-inset-bottom);overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tbar::-webkit-scrollbar{display:none}
-.tbar-btn{flex:1;min-width:70px;padding:.55rem .2rem .45rem;font-size:.58rem;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .15s;white-space:nowrap}
+.tbar-btn{flex:1;min-width:60px;padding:.4rem .2rem .35rem;font-size:.55rem;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .15s;white-space:nowrap}
 .tbar-icon{font-size:1.3rem;line-height:1}
 .tbar-btn.on{color:var(--accent)}
 
-.app-body{flex:1;overflow-y:auto;padding:.5rem .5rem 0;padding-bottom:calc(65px + env(safe-area-inset-bottom))}
+.app-body{flex:1;overflow-y:auto;padding:.3rem .4rem 0;padding-bottom:calc(62px + env(safe-area-inset-bottom))}
 .panel{display:none}
 .panel.on{display:block;min-height:0}
 
@@ -294,7 +294,12 @@ tr:last-child td{border-bottom:none}
         <div class="cal-title" id="owner-cal-title">-</div>
         <button class="cal-nav-btn" onclick="ownerCalMove(1)">›</button>
       </div>
-      <div id="owner-shift-area"><div class="spin">読み込み中...</div></div>
+      <div class="cal-legend">
+        <div class="leg"><div class="leg-dot" style="background:var(--blue)"></div>申請中</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--green)"></div>承認済</div>
+      </div>
+      <div class="cal-grid" id="owner-cal-grid"></div>
+      <div id="owner-shift-area" style="margin-top:.5rem"><div class="spin">読み込み中...</div></div>
     </div>
 
     <!-- 店舗：本日状況 -->
@@ -318,7 +323,7 @@ tr:last-child td{border-bottom:none}
       </div>
       <div class="kpi-row">
         <div class="kpi"><div class="kpi-l">月間売上</div><div class="kpi-v" id="o-sales">-</div></div>
-        <div class="kpi"><div class="kpi-l">バック総額</div><div class="kpi-v" id="o-back">-</div></div>
+        <div class="kpi"><div class="kpi-l">委託金総額</div><div class="kpi-v" id="o-back">-</div></div>
         <div class="kpi"><div class="kpi-l">施術件数</div><div class="kpi-v" id="o-count">-</div></div>
       </div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
@@ -329,6 +334,7 @@ tr:last-child td{border-bottom:none}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
         <div style="font-size:1rem;font-weight:700">キャスト管理</div>
         <div style="display:flex;gap:.35rem">
+          <button class="btn btn-red btn-sm2" onclick="openInactiveSheet()">退店済み</button>
           <button class="btn btn-blue btn-sm2" onclick="openStoreSettings()">⚙️ 料金設定</button>
           <button class="btn btn-gold btn-sm2" onclick="openAddCast()">＋ 追加</button>
         </div>
@@ -487,6 +493,26 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②</div><input type="number" class="fee-input" id="st-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveStoreSettings()" id="btn-save-store">保存する</button>
+  </div>
+</div>
+
+<!-- ===== 承認待ち詳細シート ===== -->
+<div class="overlay" id="owner-shift-detail-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('owner-shift-detail')">✕</button>
+    <div class="sh-title" id="owner-shift-detail-title">シフト詳細</div>
+    <div id="owner-shift-detail-body"></div>
+  </div>
+</div>
+
+<!-- ===== 退店済みキャストシート ===== -->
+<div class="overlay" id="inactive-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('inactive')">✕</button>
+    <div class="sh-title">退店済みキャスト</div>
+    <div id="inactive-list"></div>
   </div>
 </div>
 
@@ -830,7 +856,7 @@ async function loadMySalary(){
         <div class="sal-lbl">${jpDate(w.date)}</div>
         <div class="sal-amt">${fmt(w.net||w.back)}</div>
         <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
-        <div class="sal-row"><span class="sal-rl">バック</span><span class="sal-rv">${fmt(w.back||0)}</span></div>
+        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(w.back||0)}</span></div>
         ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
         <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(w.net||w.back)}</span></div>
         <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt((w.sales||0)-(w.net||w.back||0))}</span></div>
@@ -844,66 +870,109 @@ async function loadMySalary(){
 
 // ── 店舗：シフト管理 ──
 function ownerCalMove(d){ownerCalMonth=addMonth(ownerCalMonth,d);loadOwnerCal()}
+let ownerShiftData={pending:[],approved:[]}
 async function loadOwnerCal(){
   const[y,m]=ownerCalMonth.split('-').map(Number)
   document.getElementById('owner-cal-title').textContent=y+'年'+m+'月'
   const{data:pending}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date,cast_id')
   const{data:approved}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date,cast_id')
-  const area=document.getElementById('owner-shift-area')
-  let html=''
-  if(pending&&pending.length){
-    // 日付ごとにグループ化
-    const pd={}; pending.forEach(s=>{if(!pd[s.date])pd[s.date]=[];pd[s.date].push(s)})
-    html+=`<div class="sec">承認待ち（${pending.length}件）</div>`
-    Object.entries(pd).sort().forEach(([date,ss])=>{
-      html+=`<div class="card" style="margin-bottom:.6rem">
-        <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem">${jpDate(date)}</div>`
-      ss.forEach(s=>{
-        html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
-            <div>
-              <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
-              <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
-              ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">
-            <button class="btn btn-green btn-xs" onclick="approveShift(${s.id})">✓ 承認</button>
-            <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id})">✕ 却下</button>
-            <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
-          </div>
-        </div>`
-      })
-      html+=`</div>`
-    })
-  } else html+=`<div class="empty">承認待ちのシフトはありません</div>`
+  ownerShiftData={pending:pending||[],approved:approved||[]}
 
-  if(approved&&approved.length){
-    html+=`<div class="sec" style="margin-top:.5rem">承認済みシフト</div>`
-    const bd={}; approved.forEach(s=>{if(!bd[s.date])bd[s.date]=[];bd[s.date].push(s)})
-    Object.entries(bd).sort().forEach(([date,ss])=>{
-      html+=`<div class="card" style="margin-bottom:.6rem"><div style="font-size:.88rem;font-weight:700;margin-bottom:.5rem">${jpDate(date)}</div>`
-      ss.forEach(s=>{
-        const rc3=getRoomColor(s.room)
-        const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc3.bg};color:${rc3.tx};border-color:${rc3.bd}">${s.room}</span>`:''
-        html+=`<div style="padding:.45rem 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.35rem">
-            <div>
-              <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
-              <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
-              <div class="tags" style="margin-top:.2rem">${rt}</div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
-            <button class="btn btn-purple btn-xs" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム</button>
-            <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
-          </div>
-        </div>`
-      })
-      html+=`</div>`
+  // カレンダー描画
+  const first=new Date(y,m-1,1).getDay()
+  const last=new Date(y,m,0).getDate()
+  const td=today()
+  const pendingDates={}; (pending||[]).forEach(s=>{if(!pendingDates[s.date])pendingDates[s.date]=0;pendingDates[s.date]++})
+  const approvedDates={}; (approved||[]).forEach(s=>{if(!approvedDates[s.date])approvedDates[s.date]=0;approvedDates[s.date]++})
+  const days=['日','月','火','水','木','金','土']
+  let cal=days.map((d,i)=>`<div class="cal-hdr" style="${i===0?'color:var(--rtx)':i===6?'color:var(--btx)':''}">${d}</div>`).join('')
+  for(let i=0;i<first;i++) cal+=`<div class="cal-cell empty"></div>`
+  for(let d=1;d<=last;d++){
+    const ds=ownerCalMonth+'-'+String(d).padStart(2,'0')
+    const hasPending=pendingDates[ds]>0
+    const hasApproved=approvedDates[ds]>0
+    let cls='cal-cell'
+    if(ds===td) cls+=' today'
+    if(hasPending) cls+=' requested'
+    else if(hasApproved) cls+=' approved'
+    const dot=(hasPending||hasApproved)?'<div class="cal-dot"></div>':''
+    cal+=`<div class="${cls}" onclick="ownerSelectDay('${ds}')">${d}${dot}</div>`
+  }
+  document.getElementById('owner-cal-grid').innerHTML=cal
+
+  // 承認待ち一覧をエリアに表示
+  const area=document.getElementById('owner-shift-area')
+  if(!pending||!pending.length){
+    area.innerHTML='<div class="empty">承認待ちのシフトはありません</div>'
+    return
+  }
+  const pd={}; pending.forEach(s=>{if(!pd[s.date])pd[s.date]=[];pd[s.date].push(s)})
+  let html=`<div class="sec">承認待ち（${pending.length}件）</div>`
+  Object.entries(pd).sort().forEach(([date,ss])=>{
+    html+=`<div class="card" style="margin-bottom:.6rem">
+      <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem">${jpDate(date)}</div>`
+    ss.forEach(s=>{
+      html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
+        <div style="margin-bottom:.3rem">
+          <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
+          <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
+          ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">
+          <button class="btn btn-green btn-xs" onclick="approveShift(${s.id})">✓ 承認</button>
+          <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id})">✕ 却下</button>
+          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+        </div>
+      </div>`
+    })
+    html+=`</div>`
+  })
+  area.innerHTML=html
+}
+
+function ownerSelectDay(ds){
+  const pending=ownerShiftData.pending.filter(s=>s.date===ds)
+  const approved=ownerShiftData.approved.filter(s=>s.date===ds)
+  if(!pending.length&&!approved.length) return
+  const[y,m,d]=ds.split('-')
+  const dn=['日','月','火','水','木','金','土'][new Date(ds).getDay()]
+  document.getElementById('owner-shift-detail-title').textContent=parseInt(m)+'月'+parseInt(d)+'日（'+dn+'）'
+  let html=''
+  if(pending.length){
+    html+=`<div class="sec" style="margin-top:0">承認待ち（${pending.length}件）</div>`
+    pending.forEach(s=>{
+      html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">
+        <div>
+          <div style="font-size:.92rem;font-weight:600">${s.casts?.name||'?'}</div>
+          <div style="font-size:.78rem;color:var(--text3)">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' / '+s.note:''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">
+          <button class="btn btn-green btn-xs" onclick="approveShift(${s.id});closeSheet('owner-shift-detail')">✓ 承認</button>
+          <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id});closeSheet('owner-shift-detail')">✕ 却下</button>
+          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${ds}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+        </div>
+      </div>`
     })
   }
-  area.innerHTML=html
+  if(approved.length){
+    html+=`<div class="sec">承認済み（${approved.length}件）</div>`
+    approved.forEach(s=>{
+      const rc=getRoomColor(s.room)
+      const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc.bg};color:${rc.tx};border-color:${rc.bd}">${s.room}</span>`:''
+      html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">
+        <div>
+          <div style="font-size:.92rem;font-weight:600">${s.casts?.name||'?'} ${rt}</div>
+          <div style="font-size:.78rem;color:var(--text3)">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
+          <button class="btn btn-purple btn-xs" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム</button>
+          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${ds}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+        </div>
+      </div>`
+    })
+  }
+  document.getElementById('owner-shift-detail-body').innerHTML=html
+  document.getElementById('owner-shift-detail-overlay').classList.add('on')
 }
 
 async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
@@ -1145,28 +1214,35 @@ async function saveWork(){
 async function loadCastMgmt(){
   const area=document.getElementById('cast-area')
   area.innerHTML='<div class="spin">読み込み中...</div>'
-  const{data:casts}=await sb.from('casts').select('*').order('sort_order')
-  if(!casts||!casts.length){area.innerHTML='<div class="empty">キャストがいません</div>';return}
-  const active=casts.filter(c=>c.active)
-  const inactive=casts.filter(c=>!c.active)
-  const castRow=(c)=>`
+  const{data:casts}=await sb.from('casts').select('*').eq('active',true).order('sort_order')
+  if(!casts||!casts.length){area.innerHTML='<div class="empty">在籍中のキャストがいません</div>';return}
+  area.innerHTML=casts.map(c=>`
     <div class="cast-row">
       <div class="cast-nm">${c.name}</div>
       <div class="cast-btns">
-        ${c.active?`
         <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">委託金設定</button>
         <button class="btn btn-purple btn-xs" onclick="openDiscSheet(${c.id},'${c.name}')">割引設定</button>
         <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
         <button class="btn btn-red btn-xs" onclick="toggleActive(${c.id},true)">退店</button>
-        `:`
-        <button class="btn btn-green btn-xs" onclick="toggleActive(${c.id},false)">復帰</button>
-        `}
       </div>
-    </div>`
-  let html=''
-  if(active.length) html+=`<div class="sec" style="margin-top:0">在籍中（${active.length}名）</div>`+active.map(castRow).join('')
-  if(inactive.length) html+=`<div class="sec" style="margin-top:.75rem;color:var(--rtx)">退店済（${inactive.length}名）</div>`+inactive.map(castRow).join('')
-  area.innerHTML=html
+    </div>`).join('')
+}
+
+async function openInactiveSheet(){
+  const{data:casts}=await sb.from('casts').select('*').eq('active',false).order('sort_order')
+  const area=document.getElementById('inactive-list')
+  if(!casts||!casts.length){
+    area.innerHTML='<div class="empty" style="padding:1.5rem 0">退店済みのキャストはいません</div>'
+  } else {
+    area.innerHTML=casts.map(c=>`
+      <div class="cast-row">
+        <div class="cast-nm">${c.name}</div>
+        <div class="cast-btns">
+          <button class="btn btn-green btn-xs" onclick="toggleActive(${c.id},false);closeSheet('inactive')">復帰</button>
+        </div>
+      </div>`).join('')
+  }
+  document.getElementById('inactive-overlay').classList.add('on')
 }
 
 async function openAddCast(){
@@ -1333,8 +1409,8 @@ async function loadOwnerSalary(){
     <div class="card">
       <div class="card-title">${name}</div>
       <div class="sal-hero">
-        <div class="sal-row"><span class="sal-rl">売上</span><span class="sal-rv">${fmt(d.sales)}</span></div>
-        <div class="sal-row"><span class="sal-rl">バック</span><span class="sal-rv">${fmt(d.back)}</span></div>
+        <div class="sal-row"><span class="sal-rl">総売上</span><span class="sal-rv">${fmt(d.sales)}</span></div>
+        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(d.back)}</span></div>
         <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(d.net)}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${d.count}件</span></div>
       </div>
