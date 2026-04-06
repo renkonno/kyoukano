@@ -61,10 +61,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-nav{display:flex;align-items:center;margin-bottom:.2rem}
 .cal-nav-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text2);padding:.35rem .65rem;font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
 .cal-title{font-size:.95rem;font-weight:700;color:var(--text);flex:1;text-align:center}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
-.cal-hdr{height:calc((100vw - 0.8rem - 12px) / 7);font-size:.55rem;text-align:center;color:var(--text3);font-weight:600;display:flex;align-items:center;justify-content:center}
-.cal-cell{height:calc((100vw - 0.8rem - 12px) / 7);border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
-.cal-cell.empty{height:calc((100vw - 0.8rem - 12px) / 7);opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:calc((100vw - 0.8rem - 12px) / 7);gap:2px;margin-bottom:.2rem}
+.cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);font-weight:600;display:flex;align-items:center;justify-content:center}
+.cal-cell{border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
+.cal-cell.empty{opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
 .cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
 .cal-cell.approved{background:var(--gbg);border-color:var(--gbd);color:var(--gtx)}
@@ -736,23 +736,48 @@ function renderCal(){
   const last=new Date(y,m,0).getDate()
   const td=today()
   const sm={}; myShifts.forEach(s=>sm[s.date]=s)
-  const days=['日','月','火','水','木','金','土']
-  let html=days.map((d,i)=>`<div class="cal-hdr" style="${i===0?'color:var(--rtx)':i===6?'color:var(--btx)':''}">${d}</div>`).join('')
-  for(let i=0;i<first;i++) html+=`<div class="cal-cell empty"></div>`
+  const days=['月','火','水','木','金','土','日']
+  const firstDow=(first+6)%7
+  const cellSize='calc((100vw - 0.8rem - 14px) / 7)'
+  // テーブル方式で描画（間隔問題を根本解決）
+  let html=`<table style="width:100%;border-collapse:collapse;table-layout:fixed"><thead><tr>`
+  days.forEach((d,i)=>{
+    const color=i===6?'color:var(--rtx)':''
+    html+=`<th style="text-align:center;font-size:.55rem;color:var(--text3);font-weight:600;padding:.1rem 0;width:${cellSize};${color}">${d}</th>`
+  })
+  html+='</tr></thead><tbody><tr>'
+  let col=0
+  // 空白セル
+  for(let i=0;i<firstDow;i++){
+    html+=`<td style="width:${cellSize};height:${cellSize}"></td>`
+    col++
+  }
   for(let d=1;d<=last;d++){
+    if(col===7){html+='</tr><tr>';col=0}
     const ds=calMonth+'-'+String(d).padStart(2,'0')
     const s=sm[ds]; const isPast=ds<td
-    let cls='cal-cell'+(isPast?' past':' ')
-    if(!isPast){
-      if(s) cls+=(s.status==='requested'?' requested':s.status==='approved'?' approved':' rejected')
-      if(ds===selectedDate) cls+=' selected'
-      else if(ds===td) cls+=' today'
-    }
     const dow=new Date(ds).getDay()
-    const isColored=!cls.includes('requested')&&!cls.includes('approved')&&!cls.includes('rejected')&&!cls.includes('selected')&&!cls.includes('today')
-    const dayColor=isColored?(dow===0?'color:var(--rtx)':dow===6?'color:var(--btx)':''):''
-    html+=`<div class="${cls}" style="${dayColor}" onclick="${isPast?'':'selectDay(\''+ds+'\')'}">${d}${s?'<div class="cal-dot"></div>':''}</div>`
+    let bg='',border='',color='',fontWeight='500'
+    if(!isPast){
+      if(s){
+        if(s.status==='requested'){bg='var(--bbg)';border='1.5px solid var(--bbd)';color='var(--btx)'}
+        else if(s.status==='approved'){bg='var(--gbg)';border='1.5px solid var(--gbd)';color='var(--gtx)'}
+        else{bg='var(--rbg)';border='1.5px solid var(--rbd)';color='var(--rtx)';fontWeight='400'}
+      }
+      if(ds===selectedDate){bg='var(--accent-f)';border='1.5px solid var(--accent)';color='var(--accent)';fontWeight='700'}
+      else if(ds===td){border='1.5px solid var(--accent)';color='var(--accent)';fontWeight='700'}
+    }
+    if(!color&&!s){color=dow===0?'var(--rtx)':dow===6?'var(--btx)':'var(--text2)'}
+    const opacity=isPast?'0.3':''
+    const cursor=isPast?'default':'pointer'
+    const onclick=isPast?'':'selectDay(\''+ds+'\')'
+    const dot=s?`<div style="width:3px;height:3px;border-radius:50%;background:${color};position:absolute;bottom:2px;left:50%;transform:translateX(-50%)"></div>`:''
+    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${d}${dot}</td>`
+    col++
   }
+  // 残りの空白
+  while(col<7&&col>0){html+=`<td style="width:${cellSize};height:${cellSize}"></td>`;col++}
+  html+='</tr></tbody></table>'
   document.getElementById('cal-grid').innerHTML=html
   renderShiftStatus()
 }
