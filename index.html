@@ -63,7 +63,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-title{font-size:1rem;font-weight:700;color:var(--text);flex:1;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.4rem}
 .cal-hdr{font-size:.58rem;text-align:center;color:var(--text3);padding:.18rem 0;font-weight:600}
-.cal-cell{height:calc((100vw - 1.2rem) / 7);max-height:44px;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.72rem;font-weight:500;color:var(--text2);position:relative}
+.cal-cell{height:calc((100vw - 1.2rem) / 7);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.72rem;font-weight:500;color:var(--text2);position:relative}
 .cal-cell.empty,.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
 .cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
@@ -419,9 +419,12 @@ tr:last-child td{border-bottom:none}
     </div>
     <div class="fee-sec">
       <div class="fee-sec-title">⭐ 指名・オプションバック</div>
-      <div class="fee-row"><div class="fee-lbl">指名バック</div><input type="number" class="fee-input" id="f-shimei" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">フリーバック</div><input type="number" class="fee-input" id="f-shimei-free" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">ネット指名バック</div><input type="number" class="fee-input" id="f-shimei-net" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">本指名バック</div><input type="number" class="fee-input" id="f-shimei-hon" min="0" step="100"><span class="fee-unit">円</span></div>
       <div class="fee-row"><div class="fee-lbl">極液バック</div><input type="number" class="fee-input" id="f-op1" min="0" step="100"><span class="fee-unit">円</span></div>
-      <div class="fee-row"><div class="fee-lbl">衣装チェンジバック</div><input type="number" class="fee-input" id="f-op2" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">衣装チェンジ①バック</div><input type="number" class="fee-input" id="f-op2" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">衣装チェンジ②バック</div><input type="number" class="fee-input" id="f-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveFee()" id="btn-save-fee">保存する</button>
   </div>
@@ -587,10 +590,11 @@ function salTab(mode){
 function tab(name){
   document.querySelectorAll('.tbar-btn').forEach(b=>b.classList.remove('on'))
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'))
-  const map={'shift':'.cast-tab:nth-child(1)','salary':'.cast-tab:nth-child(2)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)'}
+  const map={'shift':'.cast-tab:nth-child(1)','shift-list':'.cast-tab:nth-child(2)','salary':'.cast-tab:nth-child(3)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)'}
   document.querySelector(map[name])?.classList.add('on')
   document.getElementById('p-'+name)?.classList.add('on')
   if(name==='shift')        loadCal()
+  if(name==='shift-list')   loadShiftList()
   if(name==='salary')       loadMySalary()
   if(name==='owner-shift')  loadOwnerCal()
   if(name==='today')        loadToday()
@@ -771,15 +775,17 @@ async function loadMySalary(){
       sessionLines=d
     }
     dailyHtml+=`<div class="card" style="margin-bottom:.55rem">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
-        <div style="font-size:.95rem;font-weight:700">${jpDate(w.date)}</div>
-        <div style="text-align:right">
-          <div style="font-size:1.3rem;font-weight:700;color:var(--gtx)">${fmt(w.net||w.back)}</div>
-          <div style="font-size:.65rem;color:var(--text3)">${w.count}本</div>
-        </div>
+      <div class="sal-hero">
+        <div class="sal-lbl">${jpDate(w.date)}</div>
+        <div class="sal-amt">${fmt(w.net||w.back)}</div>
+        <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
+        <div class="sal-row"><span class="sal-rl">バック</span><span class="sal-rv">${fmt(w.back||0)}</span></div>
+        ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
+        <div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(w.net||w.back)}</span></div>
+        <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt((w.sales||0)-(w.net||w.back||0))}</span></div>
+        <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
       </div>
-      <div>${sessionLines}</div>
-      ${w.misc?`<div style="font-size:.72rem;color:var(--rtx);margin-top:.3rem;text-align:right">雑費 -${fmt(w.misc)}</div>`:''}
+      <div style="margin-top:.5rem">${sessionLines}</div>
     </div>`
   })
   if(dailyArea) dailyArea.innerHTML=dailyHtml
@@ -1069,6 +1075,212 @@ async function saveWork(){
   btn.disabled=false;btn.textContent='保存する'
   if(err){toast('エラーが発生しました');return}
   toast('保存しました！');closeSheet('work')
+}
+
+// ── キャスト管理 ──
+async function loadCastMgmt(){
+  const area=document.getElementById('cast-area')
+  area.innerHTML='<div class="spin">読み込み中...</div>'
+  const{data:casts}=await sb.from('casts').select('*').order('sort_order')
+  if(!casts||!casts.length){area.innerHTML='<div class="empty">キャストがいません</div>';return}
+  area.innerHTML=casts.map(c=>`
+    <div class="cast-row">
+      <div class="cast-nm">${c.name} ${c.active?'':'<span class="tag tr2">退店</span>'}</div>
+      <div class="cast-btns">
+        <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">バック設定</button>
+        <button class="btn btn-purple btn-xs" onclick="openDiscSheet(${c.id},'${c.name}')">割引設定</button>
+        <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
+        <button class="btn ${c.active?'btn-red':'btn-green'} btn-xs" onclick="toggleActive(${c.id},${c.active})">${c.active?'退店':'復帰'}</button>
+      </div>
+    </div>`).join('')
+}
+
+async function openAddCast(){
+  document.getElementById('new-name').value=''
+  document.getElementById('new-pin').value=''
+  document.getElementById('cast-add-err').textContent=''
+  document.getElementById('cast-overlay').classList.add('on')
+}
+
+async function addCast(){
+  const name=document.getElementById('new-name').value.trim()
+  const pin=document.getElementById('new-pin').value.trim()
+  const err=document.getElementById('cast-add-err')
+  if(!name){err.textContent='名前を入力してください';return}
+  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  const{data:maxData}=await sb.from('casts').select('sort_order').order('sort_order',{ascending:false}).limit(1)
+  const nextOrder=((maxData||[])[0]?.sort_order||0)+1
+  const{error}=await sb.from('casts').insert({name,pin,sort_order:nextOrder,active:true})
+  if(error){err.textContent='エラー：'+error.message;return}
+  const{data:newCast}=await sb.from('casts').select('id').eq('name',name).order('id',{ascending:false}).limit(1)
+  if(newCast&&newCast[0]){
+    await sb.from('cast_fees').insert({cast_id:newCast[0].id,back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500})
+  }
+  toast('追加しました！')
+  closeSheet('cast')
+  loadCastMgmt()
+  init()
+}
+
+async function changePIN(castId,name){
+  const pin=prompt(name+'の新しいPIN（4桁）を入力してください')
+  if(!pin)return
+  if(pin.length!==4||isNaN(pin)){toast('PINは4桁の数字で入力してください');return}
+  const{error}=await sb.from('casts').update({pin}).eq('id',castId)
+  if(error){toast('エラーが発生しました');return}
+  toast('PINを変更しました！')
+  loadCastMgmt()
+}
+
+async function toggleActive(castId,current){
+  await sb.from('casts').update({active:!current}).eq('id',castId)
+  toast(current?'退店にしました':'復帰しました')
+  loadCastMgmt()
+  init()
+}
+
+// ── バック設定 ──
+let feeCastId2=null
+async function openFeeSheet(castId,name){
+  feeCastId2=castId
+  document.getElementById('fee-title').textContent=name+' のバック設定'
+  const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castId).single()
+  const f=fee||{}
+  document.getElementById('f-b50').value=f.back_50??5850
+  document.getElementById('f-b80').value=f.back_80??7200
+  document.getElementById('f-b100').value=f.back_100??8460
+  document.getElementById('f-b130').value=f.back_130??10340
+  document.getElementById('f-bext').value=f.back_ext30??2400
+  const fsfEl=document.getElementById('f-shimei-free')
+  const fsnEl=document.getElementById('f-shimei-net')
+  const fshEl=document.getElementById('f-shimei-hon')
+  if(fsfEl) fsfEl.value=f.shimei_free??0
+  if(fsnEl) fsnEl.value=f.shimei_net??300
+  if(fshEl) fshEl.value=f.shimei_hon??500
+  document.getElementById('f-op1').value=f.op_gokueki??500
+  document.getElementById('f-op2').value=f.op_isho??500
+  const op3El=document.getElementById('f-op3')
+  if(op3El) op3El.value=f.op_isho2??500
+  document.getElementById('fee-overlay').classList.add('on')
+}
+
+async function saveFee(){
+  const btn=document.getElementById('btn-save-fee')
+  btn.disabled=true;btn.textContent='保存中...'
+  const g=id=>parseInt(document.getElementById(id)?.value)||0
+  const payload={
+    cast_id:feeCastId2,
+    back_50:g('f-b50'),back_80:g('f-b80'),back_100:g('f-b100'),back_130:g('f-b130'),back_ext30:g('f-bext'),
+    shimei_free:g('f-shimei-free'),shimei_net:g('f-shimei-net'),shimei_hon:g('f-shimei-hon'),
+    op_gokueki:g('f-op1'),op_isho:g('f-op2'),op_isho2:g('f-op3')
+  }
+  const{data:ex}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
+  if(ex)await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
+  else await sb.from('cast_fees').insert(payload)
+  btn.disabled=false;btn.textContent='保存する'
+  toast('保存しました！');closeSheet('fee')
+}
+
+// ── 割引設定 ──
+let discCastId2=null
+async function openDiscSheet(castId,name){
+  discCastId2=castId
+  document.getElementById('disc-title').textContent=name+' の割引設定'
+  await renderDiscList()
+  document.getElementById('disc-overlay').classList.add('on')
+}
+
+async function renderDiscList(){
+  const{data:discs}=await sb.from('cast_discounts').select('*').eq('cast_id',discCastId2).order('sort_order')
+  const area=document.getElementById('disc-list')
+  if(!area)return
+  area.innerHTML=(discs||[]).map(d=>`
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+      <span style="flex:1;font-size:.88rem">${d.name}</span>
+      <span style="font-size:.88rem;color:var(--rtx)">-${fmt(d.amount)}</span>
+      <button class="btn btn-red btn-xs" onclick="deleteDisc(${d.id})">削除</button>
+    </div>`).join('')||'<div style="font-size:.76rem;color:var(--text3)">割引なし</div>'
+}
+
+async function saveDisc(){
+  const name=document.getElementById('disc-name')?.value.trim()
+  const amount=parseInt(document.getElementById('disc-amount')?.value)||0
+  if(!name){toast('項目名を入力してください');return}
+  await sb.from('cast_discounts').insert({cast_id:discCastId2,name,amount,sort_order:99})
+  if(document.getElementById('disc-name')) document.getElementById('disc-name').value=''
+  if(document.getElementById('disc-amount')) document.getElementById('disc-amount').value=''
+  await renderDiscList()
+  toast('追加しました！')
+}
+
+async function deleteDisc(id){
+  await sb.from('cast_discounts').delete().eq('id',id)
+  await renderDiscList()
+  toast('削除しました')
+}
+
+// ── 店舗給与精算 ──
+function ownerSalMove(d){ownerSalMonth=addMonth(ownerSalMonth,d);loadOwnerSalary()}
+
+async function loadOwnerSalary(){
+  const[y,m]=ownerSalMonth.split('-').map(Number)
+  document.getElementById('owner-sal-title').textContent=y+'年'+m+'月'
+  const area=document.getElementById('owner-sal-area')
+  area.innerHTML='<div class="spin">読み込み中...</div>'
+  const{data:works}=await sb.from('works').select('*,casts(name)').gte('date',ownerSalMonth+'-01').lt('date',nextYM(ownerSalMonth)+'-01').order('date')
+  if(!works||!works.length){
+    document.getElementById('o-sales').textContent='¥0'
+    document.getElementById('o-back').textContent='¥0'
+    document.getElementById('o-count').textContent='0件'
+    area.innerHTML='<div class="empty">この月の記録はまだありません</div>'
+    return
+  }
+  const totalSales=works.reduce((s,w)=>s+(w.sales||0),0)
+  const totalBack=works.reduce((s,w)=>s+(w.back||0),0)
+  const totalCount=works.reduce((s,w)=>s+(w.count||0),0)
+  document.getElementById('o-sales').textContent=fmt(totalSales)
+  document.getElementById('o-back').textContent=fmt(totalBack)
+  document.getElementById('o-count').textContent=totalCount+'件'
+  const bycast={}
+  works.forEach(w=>{
+    const n=w.casts?.name||'不明'
+    if(!bycast[n])bycast[n]={sales:0,back:0,net:0,count:0,works:[]}
+    bycast[n].sales+=w.sales||0
+    bycast[n].back+=w.back||0
+    bycast[n].net+=w.net||w.back||0
+    bycast[n].count+=w.count||0
+    bycast[n].works.push(w)
+  })
+  area.innerHTML=Object.entries(bycast).map(([name,d])=>`
+    <div class="card">
+      <div class="card-title">${name}</div>
+      <div class="sal-hero">
+        <div class="sal-row"><span class="sal-rl">売上</span><span class="sal-rv">${fmt(d.sales)}</span></div>
+        <div class="sal-row"><span class="sal-rl">バック</span><span class="sal-rv">${fmt(d.back)}</span></div>
+        <div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(d.net)}</span></div>
+        <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${d.count}件</span></div>
+      </div>
+      ${d.works.map((w,wi)=>{
+        const sessions=w.sessions||[]
+        const detail=sessions.length?sessions.map((s,i)=>`<div style="font-size:.76rem;color:var(--text3);padding:.15rem 0">${i+1}本目：${s.course_name}：${s.shimei_type}${(s.options||[]).map(o=>('：'+o.name)).join('')}</div>`).join(''):''
+        return `<div style="border-top:1px solid var(--border);padding:.5rem 0;margin-top:.5rem">
+          <div style="font-size:.8rem;font-weight:600">${jpDate(w.date)}</div>
+          ${detail}
+          <div style="font-size:.8rem;color:var(--gtx);margin-top:.25rem">手取り：${fmt(w.net||w.back)}</div>
+          <div style="display:flex;gap:.35rem;margin-top:.35rem">
+            <button class="btn btn-blue btn-xs" onclick="openWorkSheet('${w.id}','${name}','${w.date}',${w.cast_id})">修正</button>
+            <button class="btn btn-red btn-xs" onclick="deleteWork(${w.id})">削除</button>
+          </div>
+        </div>`
+      }).join('')}
+    </div>`).join('')
+}
+
+async function deleteWork(id){
+  if(!confirm('この記録を削除しますか？'))return
+  await sb.from('works').delete().eq('id',id)
+  toast('削除しました')
+  loadOwnerSalary()
 }
 
 init()
