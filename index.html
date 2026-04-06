@@ -64,7 +64,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
 .cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);padding:.1rem 0;font-weight:600}
 .cal-cell{height:calc((100vh - 210px) / 7);min-height:0;max-height:48px;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
-.cal-cell.empty,.cal-cell.past{opacity:.3;cursor:default}
+.cal-cell.empty{height:calc((100vh - 210px) / 7);min-height:0;max-height:48px;opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
 .cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
 .cal-cell.approved{background:var(--gbg);border-color:var(--gbd);color:var(--gtx)}
@@ -369,6 +369,12 @@ tr:last-child td{border-bottom:none}
     <div class="fg"><label>雑費（円）</label>
       <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="calcTotal2()" placeholder="0">
     </div>
+    <div class="fg"><label>お支払い方法</label>
+      <select class="fi2" id="w-payment" onchange="calcTotal2()">
+        <option value="cash">現金</option>
+        <option value="card">カード</option>
+      </select>
+    </div>
     <div class="sal-hero" style="margin-bottom:.75rem">
       <div class="sal-lbl">本日の集計</div>
       <div id="w-breakdown"></div>
@@ -435,7 +441,17 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ①バック</div><input type="number" class="fee-input" id="f-op2" min="0" step="100"><span class="fee-unit">円</span></div>
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②バック</div><input type="number" class="fee-input" id="f-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
-    <button class="btn btn-gold btn-full" onclick="saveFee()" id="btn-save-fee">保存する</button>
+    <button class="btn btn-gold btn-full" onclick="saveFee()" id="btn-save-fee" style="margin-bottom:.75rem">保存する</button>
+    <div style="border-top:1px solid var(--border);padding-top:.75rem">
+      <div class="fee-sec-title">🏷️ 割引設定</div>
+      <div id="fee-disc-list" style="margin-bottom:.5rem"></div>
+      <div style="display:grid;grid-template-columns:1fr 80px auto;gap:.35rem;align-items:end">
+        <div><input type="text" class="fi2" id="fd-name" placeholder="割引名"></div>
+        <div><input type="number" class="fi2" id="fd-amount" min="0" step="100" placeholder="金額"></div>
+        <div><select class="fi2" id="fd-type"><option value="back">委託金</option><option value="shop">店落ち</option></select></div>
+      </div>
+      <button class="btn btn-ghost btn-full" onclick="addFeeDisc()" style="margin-top:.5rem">＋ 割引を追加</button>
+    </div>
   </div>
 </div>
 
@@ -945,39 +961,55 @@ function ownerSelectDay(ds){
   const dn=['日','月','火','水','木','金','土'][new Date(ds).getDay()]
   document.getElementById('owner-shift-detail-title').textContent=parseInt(m)+'月'+parseInt(d)+'日（'+dn+'）'
   let html=''
+
+  // 承認待ち
   if(pending.length){
-    html+=`<div class="sec" style="margin-top:0">承認待ち（${pending.length}件）</div>`
-    pending.forEach(s=>{
-      html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">
-        <div>
-          <div style="font-size:.92rem;font-weight:600">${s.casts?.name||'?'}</div>
-          <div style="font-size:.78rem;color:var(--text3)">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' / '+s.note:''}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">
-          <button class="btn btn-green btn-xs" onclick="approveShift(${s.id});closeSheet('owner-shift-detail')">✓ 承認</button>
-          <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id});closeSheet('owner-shift-detail')">✕ 却下</button>
-          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${ds}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
-        </div>
-      </div>`
+    html+='<div class="sec" style="margin-top:0">承認待ち（'+pending.length+'件）</div>'
+    pending.forEach(function(s){
+      const sid=s.id
+      const sname=(s.casts&&s.casts.name)||'?'
+      const sstart=(s.start_time||'').slice(0,5)||'13:00'
+      const send=(s.end_time||'').slice(0,5)||'22:00'
+      const snote=s.note||''
+      const stime=sstart+'〜'+send
+      html+='<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">'
+      html+='<div><div style="font-size:.92rem;font-weight:600">'+sname+'</div>'
+      html+='<div style="font-size:.78rem;color:var(--text3)">'+stime+(snote?' / '+snote:'')+'</div></div>'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">'
+      html+='<button class="btn btn-green btn-xs" onclick="approveShift('+sid+');closeSheet(\'owner-shift-detail\')">✓ 承認</button>'
+      html+='<button class="btn btn-red btn-xs" onclick="rejectShift('+sid+');closeSheet(\'owner-shift-detail\')">✕ 却下</button>'
+      html+='<button class="btn btn-gray btn-xs" onclick="openShiftEdit('+sid+',\''+sname+'\',\''+ds+'\',\''+sstart+'\',\''+send+'\',\''+snote+'\')">訂正</button>'
+      html+='</div></div>'
     })
   }
+
+  // 承認済み（ルームごとにまとめる）
   if(approved.length){
-    html+=`<div class="sec">承認済み（${approved.length}件）</div>`
-    approved.forEach(s=>{
-      const rc=getRoomColor(s.room)
-      const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc.bg};color:${rc.tx};border-color:${rc.bd}">${s.room}</span>`:''
-      html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">
-        <div>
-          <div style="font-size:.92rem;font-weight:600">${s.casts?.name||'?'} ${rt}</div>
-          <div style="font-size:.78rem;color:var(--text3)">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
-          <button class="btn btn-purple btn-xs" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム</button>
-          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${ds}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
-        </div>
-      </div>`
+    html+='<div class="sec">承認済み（'+approved.length+'件）</div>'
+    const rooms={}
+    approved.forEach(function(s){ const r=s.room||'ルーム未定'; if(!rooms[r])rooms[r]=[]; rooms[r].push(s) })
+    Object.entries(rooms).forEach(function([room,ss]){
+      const rc=getRoomColor(room==='ルーム未定'?null:room)
+      const roomLabel=room==='ルーム未定'?'<span style="font-size:.75rem;color:var(--text3)">ルーム未定</span>':'<span style="font-size:.72rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:'+rc.bg+';color:'+rc.tx+';border-color:'+rc.bd+'">'+room+'</span>'
+      html+='<div class="card" style="margin-bottom:.5rem"><div style="margin-bottom:.4rem">'+roomLabel+'</div>'
+      ss.forEach(function(s){
+        const sid=s.id
+        const sname=(s.casts&&s.casts.name)||'?'
+        const sstart=(s.start_time||'').slice(0,5)||'13:00'
+        const send=(s.end_time||'').slice(0,5)||'22:00'
+        const sroom=s.room||''
+        const stimestr=sstart+'〜'+send
+        html+='<div style="padding:.35rem 0;border-bottom:1px solid var(--border)">'
+        html+='<div style="font-size:.88rem;font-weight:600;margin-bottom:.25rem">'+sname+' <span style="font-size:.72rem;color:var(--text3)">'+stimestr+'</span></div>'
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">'
+        html+='<button class="btn btn-purple btn-xs" onclick="openRoom('+sid+',\''+sname+'\',\''+stimestr+'\',\''+sroom+'\')">ルーム変更</button>'
+        html+='<button class="btn btn-gray btn-xs" onclick="openShiftEdit('+sid+',\''+sname+'\',\''+ds+'\',\''+sstart+'\',\''+send+'\',\'\')">訂正</button>'
+        html+='</div></div>'
+      })
+      html+='</div>'
     })
   }
+
   document.getElementById('owner-shift-detail-body').innerHTML=html
   document.getElementById('owner-shift-detail-overlay').classList.add('on')
 }
@@ -1180,6 +1212,8 @@ function calcTotal2(){
   bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
   if(discFromBack>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（委託金引き）</span><span class="sal-rv neg">-${fmt(discFromBack)}</span></div>`
   if(discFromShop>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（店落ち引き）</span><span class="sal-rv neg">-${fmt(discFromShop)}</span></div>`
+  const payment=document.getElementById('w-payment')?.value||'cash'
+  bd+=`<div class="sal-row"><span class="sal-rl">お支払い</span><span class="sal-rv">${payment==='card'?'💳 カード':'💴 現金'}</span></div>`
   document.getElementById('w-breakdown').innerHTML=bd
 }
 // 旧calcTotal互換
@@ -1216,7 +1250,8 @@ async function saveWork(){
   })
   const net=totalBack-discFromBack-misc
   const shopDrop=totalSales-net-discFromShop
-  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  const payment=document.getElementById('w-payment')?.value||'cash'
+  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,payment,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
   const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
   let err
   if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
@@ -1254,11 +1289,26 @@ async function openInactiveSheet(){
       <div class="cast-row">
         <div class="cast-nm">${c.name}</div>
         <div class="cast-btns">
-          <button class="btn btn-green btn-xs" onclick="toggleActive(${c.id},false);closeSheet('inactive')">復帰</button>
+          <button class="btn btn-green btn-xs" onclick="toggleActive(${c.id},false);openInactiveSheet()">復帰</button>
+          <button class="btn btn-red btn-xs" onclick="deleteCast(${c.id},'${c.name}')">完全消去</button>
         </div>
       </div>`).join('')
   }
   document.getElementById('inactive-overlay').classList.add('on')
+}
+
+async function deleteCast(castId, name){
+  if(!confirm(name+'を完全に消去しますか？\nこの操作は取り消せません。シフト・委託金記録も全て削除されます。')) return
+  // 関連データを削除
+  await sb.from('cast_fees').delete().eq('cast_id',castId)
+  await sb.from('cast_discounts').delete().eq('cast_id',castId)
+  await sb.from('shifts').delete().eq('cast_id',castId)
+  await sb.from('works').delete().eq('cast_id',castId)
+  const{error}=await sb.from('casts').delete().eq('id',castId)
+  if(error){toast('エラー: '+error.message);return}
+  toast(name+'を完全消去しました')
+  openInactiveSheet()
+  init()
 }
 
 async function openAddCast(){
@@ -1313,7 +1363,7 @@ async function toggleActive(castId,current){
 let feeCastId2=null
 async function openFeeSheet(castId,name){
   feeCastId2=castId
-  document.getElementById('fee-title').textContent=name+' のバック設定'
+  document.getElementById('fee-title').textContent=name+' の委託金設定'
   const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castId).single()
   const f=fee||{}
   document.getElementById('f-b50').value=f.back_50??5850
@@ -1331,7 +1381,40 @@ async function openFeeSheet(castId,name){
   document.getElementById('f-op2').value=f.op_isho??500
   const op3El=document.getElementById('f-op3')
   if(op3El) op3El.value=f.op_isho2??500
+  // 割引リスト読み込み
+  await renderFeeDiscList()
   document.getElementById('fee-overlay').classList.add('on')
+}
+
+async function renderFeeDiscList(){
+  const{data:discs}=await sb.from('cast_discounts').select('*').eq('cast_id',feeCastId2).order('sort_order')
+  const area=document.getElementById('fee-disc-list')
+  if(!area) return
+  area.innerHTML=(discs||[]).map(d=>`
+    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">
+      <span style="flex:1;font-size:.82rem">${d.name}</span>
+      <span style="font-size:.72rem;color:var(--rtx)">-${fmt(d.amount)}</span>
+      <span style="font-size:.65rem;color:${d.disc_type==='shop'?'var(--btx)':'var(--rtx)'}">${d.disc_type==='shop'?'店落ち':'委託金'}</span>
+      <button class="btn btn-red btn-xs" onclick="deleteFeeDisc(${d.id})">削除</button>
+    </div>`).join('')||'<div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">割引なし</div>'
+}
+
+async function addFeeDisc(){
+  const name=document.getElementById('fd-name')?.value.trim()
+  const amount=parseInt(document.getElementById('fd-amount')?.value)||0
+  const disc_type=document.getElementById('fd-type')?.value||'back'
+  if(!name){toast('割引名を入力してください');return}
+  await sb.from('cast_discounts').insert({cast_id:feeCastId2,name,amount,disc_type,sort_order:99})
+  if(document.getElementById('fd-name')) document.getElementById('fd-name').value=''
+  if(document.getElementById('fd-amount')) document.getElementById('fd-amount').value=''
+  await renderFeeDiscList()
+  toast('割引を追加しました')
+}
+
+async function deleteFeeDisc(id){
+  await sb.from('cast_discounts').delete().eq('id',id)
+  await renderFeeDiscList()
+  toast('削除しました')
 }
 
 async function saveFee(){
@@ -1440,7 +1523,7 @@ async function loadOwnerSalary(){
         return `<div style="border-top:1px solid var(--border);padding:.5rem 0;margin-top:.5rem">
           <div style="font-size:.8rem;font-weight:600">${jpDate(w.date)}</div>
           ${detail}
-          <div style="font-size:.8rem;color:var(--gtx);margin-top:.25rem">委託金：${fmt(w.net||w.back)}</div>
+          <div style="font-size:.8rem;color:var(--gtx);margin-top:.25rem">委託金：${fmt(w.net||w.back)} ${w.payment==="card"?"💳 カード":"💴 現金"}</div>
           <div style="display:flex;gap:.35rem;margin-top:.35rem">
             <button class="btn btn-blue btn-xs" onclick="openWorkSheet('${w.id}','${name}','${w.date}',${w.cast_id})">修正</button>
             <button class="btn btn-red btn-xs" onclick="deleteWork(${w.id})">削除</button>
