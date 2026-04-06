@@ -136,7 +136,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 
 /* CAL TABLE RESET */
 .cal-table{border-collapse:separate!important;border-spacing:2px!important}
-.cal-table th,.cal-table td{border:none!important;background:none!important;padding:0!important;color:inherit!important}
+.cal-table th{border:none!important;background:none!important;padding:.1rem 0!important;color:var(--text3)!important}.cal-table td{border:none!important;padding:0!important}
 
 /* TABLE */
 .tbl{background:var(--surface);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem;box-shadow:var(--sh)}
@@ -598,7 +598,7 @@ const ROOM_COLORS = {
   '金山ルーム':  {bg:'#fefce8',tx:'#854d0e',bd:'#fef08a',card:'#fef9c3'},
 }
 function getRoomColor(room){return ROOM_COLORS[room]||{bg:'var(--pbg)',tx:'var(--ptx)',bd:'var(--pbd)',card:'var(--pbg)'}}
-const DEFAULT_FEE = {back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500,shop_shimei_free:0,shop_shimei_net:1000,shop_shimei_hon:2000,shop_op_gokueki:2000,shop_op_isho:3000,shop_op_isho2:3000,misc_0:0,misc_1:1000,misc_3:2000,misc_enabled:true}
+const DEFAULT_FEE = {back_50:6000,back_80:8000,back_100:9000,back_130:11000,back_ext30:3000,shimei_free:0,shimei_net:1000,shimei_hon:1000,op_gokueki:1000,op_isho:2000,op_isho2:3000,shop_shimei_free:0,shop_shimei_net:1000,shop_shimei_hon:2000,shop_op_gokueki:2000,shop_op_isho:3000,shop_op_isho2:3000,misc_0:0,misc_1:1000,misc_3:2000,misc_enabled:true}
 
 // 営業時間プルダウン用（11:00〜翌2:00）
 function buildTimeOptions(selectedVal=''){
@@ -776,8 +776,7 @@ function renderCal(){
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'承認済':'却下'):''
-    const timeText=s&&s.start_time?s.start_time.slice(0,5):''
-    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${timeText?`<span style="font-size:.4rem;line-height:1.1">${timeText}</span>`:''}${statusText?`<span style="font-size:.4rem;line-height:1.1">${statusText}</span>`:''}</div>`
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusText?`<span style="font-size:.4rem;line-height:1.1">${statusText}</span>`:''}</div>`
     html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
   }
@@ -978,7 +977,8 @@ async function loadOwnerCal(){
     else if(hasPending){bg2='var(--bbg)';border2='1.5px solid var(--bbd)';color2='var(--btx)'}
     else if(hasApproved){bg2='var(--gbg)';border2='1.5px solid var(--gbd)';color2='var(--gtx)'}
     if(!color2){color2=dow2===0?'var(--rtx)':dow2===6?'var(--btx)':'var(--text2)'}
-    const statusLabel=hasPending?`申${pendingDates[ds]}件`:hasApproved?`承${approvedDates[ds]}件`:''
+    const totalShifts=(pendingDates[ds]||0)+(approvedDates[ds]||0)
+    const statusLabel=totalShifts>0?('出勤'+totalShifts):''
     const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.4rem;line-height:1.1">${statusLabel}</span>`:''}</div>`
     cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;font-size:.68rem;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
     col2++
@@ -1406,12 +1406,15 @@ async function openInactiveSheet(){
 async function deleteCast(castId, name){
   if(!confirm(name+'を完全に消去しますか？\nこの操作は取り消せません。シフト・委託金記録も全て削除されます。')) return
   // 関連データを削除
-  await sb.from('cast_fees').delete().eq('cast_id',castId)
-  await sb.from('cast_discounts').delete().eq('cast_id',castId)
-  await sb.from('shifts').delete().eq('cast_id',castId)
-  await sb.from('works').delete().eq('cast_id',castId)
+  const r1=await sb.from('cast_fees').delete().eq('cast_id',castId)
+  const r2=await sb.from('cast_discounts').delete().eq('cast_id',castId)
+  const r3=await sb.from('shifts').delete().eq('cast_id',castId)
+  const r4=await sb.from('works').delete().eq('cast_id',castId)
   const{error}=await sb.from('casts').delete().eq('id',castId)
-  if(error){toast('エラー: '+error.message);return}
+  if(error){
+    alert('エラー: '+error.message)
+    return
+  }
   toast(name+'を完全消去しました')
   openInactiveSheet()
   init()
