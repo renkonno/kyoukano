@@ -61,10 +61,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-nav{display:flex;align-items:center;margin-bottom:.2rem}
 .cal-nav-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text2);padding:.35rem .65rem;font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
 .cal-title{font-size:.95rem;font-weight:700;color:var(--text);flex:1;text-align:center}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:calc((100vw - 0.8rem - 12px) / 7);max-height:calc(((100vw - 0.8rem - 12px) / 7) * 7 + 42px);gap:2px;margin-bottom:.2rem}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
 .cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);padding:.1rem 0;font-weight:600}
-.cal-cell{border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
-.cal-cell.empty{opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
+.cal-cell{height:calc((100vw - 0.8rem - 12px) / 7);border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
+.cal-cell.empty{height:calc((100vw - 0.8rem - 12px) / 7);opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
 .cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
 .cal-cell.approved{background:var(--gbg);border-color:var(--gbd);color:var(--gtx)}
@@ -368,12 +368,6 @@ tr:last-child td{border-bottom:none}
     <button class="btn btn-ghost btn-full" style="margin-bottom:.75rem" onclick="addSession()">＋ 施術を追加</button>
     <div class="fg"><label>雑費（円）</label>
       <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="calcTotal2()" placeholder="0">
-    </div>
-    <div class="fg"><label>お支払い方法</label>
-      <select class="fi2" id="w-payment" onchange="calcTotal2()">
-        <option value="cash">現金</option>
-        <option value="card">カード</option>
-      </select>
     </div>
     <div class="sal-hero" style="margin-bottom:.75rem">
       <div class="sal-lbl">本日の集計</div>
@@ -741,7 +735,8 @@ function renderCal(){
       else if(ds===td) cls+=' today'
     }
     const dow=new Date(ds).getDay()
-    const dayColor=(!cls.includes('requested')&&!cls.includes('approved')&&!cls.includes('rejected')&&!cls.includes('selected')&&!cls.includes('today'))?(dow===0?'color:var(--rtx)':dow===6?'color:var(--btx)':''):''
+    const isColored=!cls.includes('requested')&&!cls.includes('approved')&&!cls.includes('rejected')&&!cls.includes('selected')&&!cls.includes('today')
+    const dayColor=isColored?(dow===0?'color:var(--rtx)':dow===6?'color:var(--btx)':''):''
     html+=`<div class="${cls}" style="${dayColor}" onclick="${isPast?'':'selectDay(\''+ds+'\')'}">${d}${s?'<div class="cal-dot"></div>':''}</div>`
   }
   document.getElementById('cal-grid').innerHTML=html
@@ -1162,7 +1157,14 @@ function addSession(data=null){
       <div><div class="session-label">コース</div><select class="fi2 s-course" onchange="calcTotal2()">${courseOpts}</select></div>
       <div><div class="session-label">指名</div><select class="fi2 s-shimei" onchange="calcTotal2()">${shimeiOpts}</select></div>
     </div>
-    <div style="margin-bottom:.4rem"><div class="session-label">支払い方法</div><select class="fi2 s-payment" onchange="calcTotal2()"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select></div>
+    <div style="margin-bottom:.4rem">
+      <div class="session-label">支払い方法（コース / 指名 / オプション）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course"><option value="現金">💴現金</option><option value="カード">💳カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei"><option value="現金">💴現金</option><option value="カード">💳カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option"><option value="現金">💴現金</option><option value="カード">💳カード</option></select></div>
+      </div>
+    </div>
     <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
     <div><div class="session-label">割引</div>${discItems}</div>`
   document.getElementById('session-list').appendChild(div)
@@ -1271,18 +1273,19 @@ async function saveWork(){
       if(dtype==='shop') discFromShop+=amt
       else discFromBack+=amt
     })
-    const payment=block.querySelector('.s-payment')?.value||'現金'
+    const payCourse=block.querySelector('.s-pay-course')?.value||'現金'
+    const payShimei=block.querySelector('.s-pay-shimei')?.value||'現金'
+    const payOption=block.querySelector('.s-pay-option')?.value||'現金'
     const shimeiPrice=getShimeiPrice(stype)
     let optSaleTotal=0
     options.forEach(o=>{ optSaleTotal+=getOptPrice(o.name) })
     const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal
-    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,sales:sessionSales,payment})
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
     totalSales+=sessionSales;totalBack+=cback+sback+optBack;totalCount++
   })
   const net=totalBack-discFromBack-misc
   const shopDrop=totalSales-net-discFromShop
-  const payment=document.getElementById('w-payment')?.value||'cash'
-  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,payment,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
   const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
   let err
   if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
