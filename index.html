@@ -265,7 +265,6 @@ tr:last-child td{border-bottom:none}
         <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>却下</div>
       </div>
       <div class="cal-grid" id="cal-grid"></div>
-      <div id="shift-form-area"></div>
     </div>
     <!-- シフト一覧パネル -->
     <div class="panel" id="p-shift-list">
@@ -914,12 +913,13 @@ async function saveShiftEdit(){
   const end=document.getElementById('se-end').value
   const note=document.getElementById('se-note').value
   const{error}=await sb.from('shifts').update({start_time:start,end_time:end,note}).eq('id',editShiftId)
-  if(error){toast('エラーが発生しました');return}
+  if(error){toast('エラー: '+error.message);console.error('saveShiftEdit error:',error);return}
   toast('シフトを訂正しました');closeSheet('shift-edit');loadOwnerCal()
 }
 async function deleteShift(){
   if(!confirm('このシフトを削除しますか？'))return
-  await sb.from('shifts').delete().eq('id',editShiftId)
+  const{error}=await sb.from('shifts').delete().eq('id',editShiftId)
+  if(error){toast('エラー: '+error.message);console.error('deleteShift error:',error);return}
   toast('削除しました');closeSheet('shift-edit');loadOwnerCal()
 }
 
@@ -1193,7 +1193,8 @@ async function toggleActive(castId,current){
   if(current){
     if(!confirm('本当に退店させますか？\nこの操作はログイン画面からも削除されます。')) return
   }
-  await sb.from('casts').update({active:!current}).eq('id',castId)
+  const{error}=await sb.from('casts').update({active:!current}).eq('id',castId)
+  if(error){toast('エラー: '+error.message);console.error('toggleActive error:',error);return}
   toast(current?'退店にしました':'復帰しました')
   loadCastMgmt()
   init()
