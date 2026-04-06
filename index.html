@@ -740,7 +740,7 @@ function renderCal(){
   const firstDow=(first+6)%7
   const cellSize='calc((100vw - 0.8rem - 14px) / 7)'
   // テーブル方式で描画（間隔問題を根本解決）
-  let html=`<table style="width:100%;border-collapse:collapse;table-layout:fixed"><thead><tr>`
+  let html=`<table style="width:100%;border-collapse:separate;border-spacing:2px;table-layout:fixed"><thead><tr>`
   days.forEach((d,i)=>{
     const color=i===6?'color:var(--rtx)':''
     html+=`<th style="text-align:center;font-size:.55rem;color:var(--text3);font-weight:600;padding:.1rem 0;width:${cellSize};${color}">${d}</th>`
@@ -771,8 +771,9 @@ function renderCal(){
     const opacity=isPast?'0.3':''
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
-    const dot=s?`<div style="width:3px;height:3px;border-radius:50%;background:${color};position:absolute;bottom:2px;left:50%;transform:translateX(-50%)"></div>`:''
-    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${d}${dot}</td>`
+    const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'承認済':'却下'):''
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusText?`<span style="font-size:.42rem;line-height:1">${statusText}</span>`:''}</div>`
+    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
   }
   // 残りの空白
@@ -950,20 +951,35 @@ async function loadOwnerCal(){
   const td=today()
   const pendingDates={}; (pending||[]).forEach(s=>{if(!pendingDates[s.date])pendingDates[s.date]=0;pendingDates[s.date]++})
   const approvedDates={}; (approved||[]).forEach(s=>{if(!approvedDates[s.date])approvedDates[s.date]=0;approvedDates[s.date]++})
-  const days=['日','月','火','水','木','金','土']
-  let cal=days.map((d,i)=>`<div class="cal-hdr" style="${i===0?'color:var(--rtx)':i===6?'color:var(--btx)':''}">${d}</div>`).join('')
-  for(let i=0;i<first;i++) cal+=`<div class="cal-cell empty"></div>`
+  const days=['月','火','水','木','金','土','日']
+  const firstDow2=(first+6)%7
+  const cellSize2='calc((100vw - 0.8rem - 14px) / 7)'
+  let cal=`<table style="width:100%;border-collapse:separate;border-spacing:2px;table-layout:fixed"><thead><tr>`
+  days.forEach((d,i)=>{
+    const color=i===6?'color:var(--rtx)':''
+    cal+=`<th style="text-align:center;font-size:.55rem;color:var(--text3);font-weight:600;padding:.1rem 0;${color}">${d}</th>`
+  })
+  cal+='</tr></thead><tbody><tr>'
+  let col2=0
+  for(let i=0;i<firstDow2;i++){cal+=`<td style="height:${cellSize2}"></td>`;col2++}
   for(let d=1;d<=last;d++){
+    if(col2===7){cal+='</tr><tr>';col2=0}
     const ds=ownerCalMonth+'-'+String(d).padStart(2,'0')
     const hasPending=pendingDates[ds]>0
     const hasApproved=approvedDates[ds]>0
-    let cls='cal-cell'
-    if(ds===td) cls+=' today'
-    if(hasPending) cls+=' requested'
-    else if(hasApproved) cls+=' approved'
-    const dot=(hasPending||hasApproved)?'<div class="cal-dot"></div>':''
-    cal+=`<div class="${cls}" onclick="ownerSelectDay('${ds}')">${d}${dot}</div>`
+    const dow2=new Date(ds).getDay()
+    let bg2='',border2='',color2=''
+    if(ds===td){border2='1.5px solid var(--accent)';color2='var(--accent)'}
+    else if(hasPending){bg2='var(--bbg)';border2='1.5px solid var(--bbd)';color2='var(--btx)'}
+    else if(hasApproved){bg2='var(--gbg)';border2='1.5px solid var(--gbd)';color2='var(--gtx)'}
+    if(!color2){color2=dow2===0?'var(--rtx)':dow2===6?'var(--btx)':'var(--text2)'}
+    const statusLabel=hasPending?'申請中':hasApproved?'承認済':''
+    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.42rem;line-height:1">${statusLabel}</span>`:''}</div>`
+    cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;font-size:.68rem;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
+    col2++
   }
+  while(col2<7&&col2>0){cal+=`<td style="height:${cellSize2}"></td>`;col2++}
+  cal+='</tr></tbody></table>'
   document.getElementById('owner-cal-grid').innerHTML=cal
 
   // 承認待ち一覧をエリアに表示
@@ -1045,8 +1061,8 @@ function ownerSelectDay(ds){
         html+='<div style="padding:.35rem 0;border-bottom:1px solid var(--border)">'
         html+='<div style="font-size:.88rem;font-weight:600;margin-bottom:.25rem">'+sname+' <span style="font-size:.72rem;color:var(--text3)">'+stimestr+'</span></div>'
         html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">'
-        html+='<button class="btn btn-purple btn-xs" onclick="openRoom('+sid+',\''+sname+'\',\''+stimestr+'\',\''+sroom+'\')">ルーム変更</button>'
-        html+='<button class="btn btn-gray btn-xs" onclick="openShiftEdit('+sid+',\''+sname+'\',\''+ds+'\',\''+sstart+'\',\''+send+'\',\'\')">訂正</button>'
+        html+='<button class="btn btn-purple btn-xs" onclick="closeSheet(\'owner-shift-detail\');setTimeout(()=>openRoom('+sid+',\''+sname+'\',\''+stimestr+'\',\''+sroom+'\'),100)">ルーム変更</button>'
+        html+='<button class="btn btn-gray btn-xs" onclick="closeSheet(\'owner-shift-detail\');setTimeout(()=>openShiftEdit('+sid+',\''+sname+'\',\''+ds+'\',\''+sstart+'\',\''+send+'\',\'\'),100)">訂正</button>'
         html+='</div></div>'
       })
       html+='</div>'
