@@ -63,7 +63,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-title{font-size:.95rem;font-weight:700;color:var(--text);flex:1;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
 .cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);padding:.1rem 0;font-weight:600}
-.cal-cell{aspect-ratio:1;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
+.cal-cell{height:calc((100vh - 210px) / 7);min-height:0;max-height:48px;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
 .cal-cell.empty,.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
 .cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
@@ -299,7 +299,8 @@ tr:last-child td{border-bottom:none}
         <div class="leg"><div class="leg-dot" style="background:var(--green)"></div>承認済</div>
       </div>
       <div class="cal-grid" id="owner-cal-grid"></div>
-      <div id="owner-shift-area" style="margin-top:.5rem"><div class="spin">読み込み中...</div></div>
+      <div style="font-size:.72rem;color:var(--text3);margin:.4rem 0 .25rem">📋 日付をタップして詳細確認・承認できます</div>
+      <div id="owner-shift-area" style="margin-top:.25rem"><div class="spin">読み込み中...</div></div>
     </div>
 
     <!-- 店舗：本日状況 -->
@@ -525,6 +526,12 @@ tr:last-child td{border-bottom:none}
     <div id="disc-list" style="margin-bottom:.75rem"></div>
     <div class="fg"><label>項目名</label><input type="text" class="fi2" id="disc-name" placeholder="例：会員割引"></div>
     <div class="fg"><label>割引金額（円）</label><input type="number" class="fi2" id="disc-amount" min="0" step="100" placeholder="1000"></div>
+    <div class="fg"><label>引く場所</label>
+      <select class="fi2" id="disc-type">
+        <option value="back">委託金から引く</option>
+        <option value="shop">店落ちから引く</option>
+      </select>
+    </div>
     <button class="btn btn-gold btn-full" onclick="saveDisc()">追加する</button>
   </div>
 </div>
@@ -1099,7 +1106,9 @@ function addSession(data=null){
   }).join('')
   const discItems=sheetDiscs.length?sheetDiscs.map(d=>{
     const checked=data?.discounts?.some(x=>x.id===d.id)?'checked':''
-    return `<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0"><input type="checkbox" class="disc-check" data-id="${d.id}" data-name="${d.name}" data-amount="${d.amount}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）</label>`
+    const typeLabel=d.disc_type==='shop'?'店落ち':'委託金'
+    const typeColor=d.disc_type==='shop'?'var(--btx)':'var(--rtx)'
+    return `<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0"><input type="checkbox" class="disc-check" data-id="${d.id}" data-name="${d.name}" data-amount="${d.amount}" data-dtype="${d.disc_type||'back'}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）<span style="font-size:.65rem;color:${typeColor}">${typeLabel}</span></label>`
   }).join(''):'<div style="font-size:.76rem;color:var(--text3)">割引設定なし</div>'
 
   div.innerHTML=`
@@ -1147,25 +1156,30 @@ function getOptBack2(name){
 }
 
 function calcTotal2(){
-  let totalBack=0,totalDisc=0,totalSales=0
+  let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0
   document.querySelectorAll('.session-block').forEach(block=>{
     const cid=parseInt(block.querySelector('.s-course').value)
     const stype=block.querySelector('.s-shimei').value
     totalBack+=getCourseBack(cid)+getShimeiBack(stype)
     block.querySelectorAll('.op-check:checked').forEach(cb=>totalBack+=getOptBack2(cb.dataset.name))
-    block.querySelectorAll('.disc-check:checked').forEach(cb=>totalDisc+=parseInt(cb.dataset.amount)||0)
+    block.querySelectorAll('.disc-check:checked').forEach(cb=>{
+      const amt=parseInt(cb.dataset.amount)||0
+      if(cb.dataset.dtype==='shop') discFromShop+=amt
+      else discFromBack+=amt
+    })
     const c=courses.find(x=>x.id===cid)
     if(c) totalSales+=c.price||0
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
-  const net=totalBack-totalDisc-misc
-  const shopDrop=totalSales-net
+  const net=totalBack-discFromBack-misc
+  const shopDrop=totalSales-net-discFromShop
   let bd=''
   bd+=`<div class="sal-row"><span class="sal-rl">総売上</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
-  bd+=`<div class="sal-row"><span class="sal-rl">委託金合計</span><span class="sal-rv tot">${fmt(net)}</span></div>`
-  bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
-  if(totalDisc>0) bd+=`<div class="sal-row"><span class="sal-rl">割引</span><span class="sal-rv neg">-${fmt(totalDisc)}</span></div>`
   if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(net)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
+  if(discFromBack>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（委託金引き）</span><span class="sal-rv neg">-${fmt(discFromBack)}</span></div>`
+  if(discFromShop>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（店落ち引き）</span><span class="sal-rv neg">-${fmt(discFromShop)}</span></div>`
   document.getElementById('w-breakdown').innerHTML=bd
 }
 // 旧calcTotal互換
@@ -1175,7 +1189,7 @@ async function saveWork(){
   const btn=document.getElementById('btn-save-work')
   btn.disabled=true;btn.textContent='保存中...'
   const misc=parseInt(document.getElementById('w-misc').value)||0
-  const sessions=[];let totalSales=0,totalBack=0,totalDisc=0,totalCount=0
+  const sessions=[];let totalSales=0,totalBack=0,discFromBack=0,discFromShop=0,totalCount=0
   document.querySelectorAll('.session-block').forEach(block=>{
     const cid=parseInt(block.querySelector('.s-course').value)
     const stype=block.querySelector('.s-shimei').value
@@ -1190,17 +1204,19 @@ async function saveWork(){
       optBack+=ob
     })
     const discounts=[]
-    let discAmt=0
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
       const amt=parseInt(cb.dataset.amount)||0
-      discounts.push({id:parseInt(cb.dataset.id),name:cb.dataset.name,amount:amt})
-      discAmt+=amt
+      const dtype=cb.dataset.dtype||'back'
+      discounts.push({id:parseInt(cb.dataset.id),name:cb.dataset.name,amount:amt,disc_type:dtype})
+      if(dtype==='shop') discFromShop+=amt
+      else discFromBack+=amt
     })
-    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,disc_amount:discAmt,sales:c.price})
-    totalSales+=c.price;totalBack+=cback+sback+optBack;totalDisc+=discAmt;totalCount++
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,sales:c.price})
+    totalSales+=c.price;totalBack+=cback+sback+optBack;totalCount++
   })
-  const net=totalBack-totalDisc-misc
-  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  const net=totalBack-discFromBack-misc
+  const shopDrop=totalSales-net-discFromShop
+  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
   const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
   let err
   if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
@@ -1351,7 +1367,7 @@ async function renderDiscList(){
   area.innerHTML=(discs||[]).map(d=>`
     <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
       <span style="flex:1;font-size:.88rem">${d.name}</span>
-      <span style="font-size:.88rem;color:var(--rtx)">-${fmt(d.amount)}</span>
+      <span style="font-size:.75rem;color:${d.disc_type==='shop'?'var(--btx)':'var(--rtx)'}">-${fmt(d.amount)} (${d.disc_type==='shop'?'店落ち':'委託金'})</span>
       <button class="btn btn-red btn-xs" onclick="deleteDisc(${d.id})">削除</button>
     </div>`).join('')||'<div style="font-size:.76rem;color:var(--text3)">割引なし</div>'
 }
@@ -1359,8 +1375,9 @@ async function renderDiscList(){
 async function saveDisc(){
   const name=document.getElementById('disc-name')?.value.trim()
   const amount=parseInt(document.getElementById('disc-amount')?.value)||0
+  const disc_type=document.getElementById('disc-type')?.value||'back'
   if(!name){toast('項目名を入力してください');return}
-  await sb.from('cast_discounts').insert({cast_id:discCastId2,name,amount,sort_order:99})
+  await sb.from('cast_discounts').insert({cast_id:discCastId2,name,amount,disc_type,sort_order:99})
   if(document.getElementById('disc-name')) document.getElementById('disc-name').value=''
   if(document.getElementById('disc-amount')) document.getElementById('disc-amount').value=''
   await renderDiscList()
@@ -1398,10 +1415,12 @@ async function loadOwnerSalary(){
   const bycast={}
   works.forEach(w=>{
     const n=w.casts?.name||'不明'
-    if(!bycast[n])bycast[n]={sales:0,back:0,net:0,count:0,works:[]}
+    if(!bycast[n])bycast[n]={sales:0,back:0,net:0,misc:0,shop_drop:0,count:0,works:[]}
     bycast[n].sales+=w.sales||0
     bycast[n].back+=w.back||0
     bycast[n].net+=w.net||w.back||0
+    bycast[n].misc+=w.misc||0
+    bycast[n].shop_drop+=w.shop_drop||0
     bycast[n].count+=w.count||0
     bycast[n].works.push(w)
   })
@@ -1410,8 +1429,9 @@ async function loadOwnerSalary(){
       <div class="card-title">${name}</div>
       <div class="sal-hero">
         <div class="sal-row"><span class="sal-rl">総売上</span><span class="sal-rv">${fmt(d.sales)}</span></div>
-        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(d.back)}</span></div>
+        <div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv">${fmt(d.misc)}</span></div>
         <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(d.net)}</span></div>
+        <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(d.sales-d.net-(d.shop_drop||0))}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${d.count}件</span></div>
       </div>
       ${d.works.map((w,wi)=>{
