@@ -949,10 +949,14 @@ let ownerShiftData={pending:[],approved:[]}
 async function loadOwnerCal(){
   const[y,m]=ownerCalMonth.split('-').map(Number)
   document.getElementById('owner-cal-title').textContent=y+'年'+m+'月'
-  const{data:pending}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
-  const{data:approved}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
+  const{data:pendingRaw}=await sb.from('shifts').select('*').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
+  const{data:approvedRaw}=await sb.from('shifts').select('*').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
+  const{data:pendingNamed}=await sb.from('shifts').select('id,cast_id,date,start_time,end_time,note,room,status,casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
+  const{data:approvedNamed}=await sb.from('shifts').select('id,cast_id,date,start_time,end_time,note,room,status,casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
+  const pending=pendingNamed||pendingRaw||[]
+  const approved=approvedNamed||approvedRaw||[]
   const addName=arr=>(arr||[]).map(s=>s)
-  ownerShiftData={pending:addName(pending)||[],approved:addName(approved)||[]}
+  ownerShiftData={pending:addName(pending),approved:addName(approved)}
   ownerShiftData={pending:addName(pending),approved:addName(approved)}
 
   // カレンダー描画
