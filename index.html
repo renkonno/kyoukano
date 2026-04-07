@@ -949,11 +949,10 @@ let ownerShiftData={pending:[],approved:[]}
 async function loadOwnerCal(){
   const[y,m]=ownerCalMonth.split('-').map(Number)
   document.getElementById('owner-cal-title').textContent=y+'年'+m+'月'
-  const{data:pending}=await sb.from('shifts').select('*').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
-  const{data:approved}=await sb.from('shifts').select('*').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
-  const{data:allCasts}=await sb.from('casts').select('id,name')
-  const getName=id=>{const c=(allCasts||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'不明'}
-  const addName=arr=>(arr||[]).map(s=>({...s,_castName:getName(s.cast_id),casts:{name:getName(s.cast_id)}}))
+  const{data:pending}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
+  const{data:approved}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
+  const addName=arr=>(arr||[]).map(s=>s)
+  ownerShiftData={pending:addName(pending)||[],approved:addName(approved)||[]}
   ownerShiftData={pending:addName(pending),approved:addName(approved)}
 
   // カレンダー描画
@@ -1008,7 +1007,7 @@ async function loadOwnerCal(){
     ss.forEach(s=>{
       html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
         <div style="margin-bottom:.3rem">
-          <span style="font-size:.88rem;font-weight:600">${s._castName||s.casts?.name||'?'}</span>
+          <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
           <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
           ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
         </div>
