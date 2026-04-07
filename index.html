@@ -295,6 +295,29 @@ tr:last-child td{border-bottom:none}
       <div id="sal-daily-area" style="display:none"></div>
     </div>
 
+    <!-- キャスト：接客メモ -->
+    <div class="panel" id="p-cast-memo">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div style="font-size:1rem;font-weight:700">接客メモ</div>
+        <button class="btn btn-gold btn-sm2" onclick="openMemoCustomerSearch()">＋ メモ追加</button>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
+        <input id="memo-search" type="text" placeholder="顧客番号・名前で検索" style="flex:1;padding:.5rem .75rem;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);font-size:.85rem;color:var(--text)" oninput="filterMemos()">
+      </div>
+      <div id="cast-memo-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+    <!-- メモ用顧客検索シート -->
+    <div class="sheet-overlay" id="memo-search-overlay">
+      <div class="sheet">
+        <div class="sheet-bar"></div>
+        <div class="sheet-title">顧客を選択</div>
+        <input type="text" id="memo-cust-search" class="fi" placeholder="顧客番号・名前で検索" oninput="renderMemoCustomerList()" style="margin-bottom:.75rem">
+        <div id="memo-cust-list" style="max-height:50vh;overflow-y:auto"></div>
+        <button class="btn btn-gray" style="width:100%;margin-top:.75rem" onclick="closeSheet('memo-search')">閉じる</button>
+      </div>
+    </div>
+
     <!-- 店舗：シフト管理 -->
     <div class="panel" id="p-owner-shift">
       <div class="cal-nav">
@@ -335,7 +358,94 @@ tr:last-child td{border-bottom:none}
         <div class="kpi"><div class="kpi-l">委託金総額</div><div class="kpi-v" id="o-back">-</div></div>
         <div class="kpi"><div class="kpi-l">施術件数</div><div class="kpi-v" id="o-count">-</div></div>
       </div>
+      <div class="kpi-row" style="margin-top:-.25rem">
+        <div class="kpi"><div class="kpi-l">💴 現金売上</div><div class="kpi-v" id="o-cash" style="font-size:.9rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">💳 カード売上</div><div class="kpi-v" id="o-card" style="font-size:.9rem">-</div></div>
+      </div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+    <!-- 店舗：顧客管理 -->
+    <div class="panel" id="p-owner-customer">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div style="font-size:1rem;font-weight:700">顧客管理</div>
+        <button class="btn btn-gold btn-sm2" onclick="openAddCustomer()">＋ 追加</button>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
+        <input id="customer-search" type="text" placeholder="名前・顧客番号で検索" style="flex:1;padding:.5rem .75rem;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);font-size:.85rem;color:var(--text)" oninput="filterCustomers()">
+      </div>
+      <div id="customer-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+
+    <!-- 顧客詳細シート -->
+    <div class="sheet-overlay" id="customer-detail-overlay">
+      <div class="sheet">
+        <div class="sheet-hdr"><span id="customer-detail-title">顧客詳細</span><button class="sheet-close" onclick="closeSheet('customer-detail')">✕</button></div>
+        <div id="customer-detail-body"></div>
+      </div>
+    </div>
+
+    <!-- 顧客追加/編集シート -->
+    <div class="sheet-overlay" id="customer-edit-overlay">
+      <div class="sheet">
+        <div class="sheet-hdr"><span id="customer-edit-title">顧客追加</span><button class="sheet-close" onclick="closeSheet('customer-edit')">✕</button></div>
+        <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1rem">
+          <input type="hidden" id="ce-id">
+          <div><div class="fi-lbl">名前</div><input class="fi" id="ce-name" placeholder="○○様"></div>
+          <div><div class="fi-lbl">電話番号</div><input class="fi" id="ce-phone" type="tel" placeholder="090-0000-0000"></div>
+          <div><div class="fi-lbl">NGキャスト</div><input class="fi" id="ce-ng" placeholder="キャスト名（複数はカンマ区切り）"></div>
+          <div><div class="fi-lbl">出禁</div>
+            <select class="fi" id="ce-banned"><option value="false">通常</option><option value="true">出禁</option></select>
+          </div>
+          <div><div class="fi-lbl">メモ</div><textarea class="fi" id="ce-memo" rows="3" placeholder="特記事項など"></textarea></div>
+          <button class="btn btn-gold" onclick="saveCustomer()">保存する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- キャストメモ入力シート -->
+    <div class="sheet-overlay" id="cast-memo-overlay">
+      <div class="sheet">
+        <div class="sheet-hdr"><span id="cast-memo-title">接客メモ</span><button class="sheet-close" onclick="closeSheet('cast-memo')">✕</button></div>
+        <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1rem">
+          <input type="hidden" id="cm-customer-id">
+          <div><div class="fi-lbl">施術日</div><input class="fi" id="cm-date" type="date"></div>
+          <div><div class="fi-lbl">メモ（施術の好み・会話内容など）</div><textarea class="fi" id="cm-memo" rows="5" placeholder="例：オイル強めが好み、アニメ好き、次回は極液希望など"></textarea></div>
+          <button class="btn btn-gold" onclick="saveCastMemo()">保存する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 予約登録シート -->
+    <div class="sheet-overlay" id="reservation-overlay">
+      <div class="sheet">
+        <div class="sheet-hdr"><span id="reservation-title">予約登録</span><button class="sheet-close" onclick="closeSheet('reservation')">✕</button></div>
+        <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1rem">
+          <input type="hidden" id="rv-shift-id">
+          <div><div class="fi-lbl">顧客番号</div>
+            <div style="display:flex;gap:.5rem">
+              <input class="fi" id="rv-cust-id" type="number" placeholder="番号入力" style="flex:1" oninput="autoFillCustomer()">
+              <span id="rv-cust-name" style="display:flex;align-items:center;font-size:.85rem;color:var(--text3);min-width:80px"></span>
+            </div>
+          </div>
+          <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様"></div>
+          <div><div class="fi-lbl">来店区分</div>
+            <select class="fi" id="rv-is-new"><option value="false">再来</option><option value="true">新規</option></select>
+          </div>
+          <div><div class="fi-lbl">指名区分</div>
+            <select class="fi" id="rv-shimei"><option value="">フリー</option><option value="ネット指名">ネット指名</option><option value="本指名">本指名</option></select>
+          </div>
+          <div><div class="fi-lbl">コース</div><select class="fi" id="rv-course"></select></div>
+          <div><div class="fi-lbl">オプション</div><input class="fi" id="rv-options" placeholder="極液、衣装②など"></div>
+          <div><div class="fi-lbl">割引</div><input class="fi" id="rv-discount" placeholder="割引内容など"></div>
+          <div><div class="fi-lbl">支払い方法</div>
+            <select class="fi" id="rv-payment"><option value="cash">現金</option><option value="card">カード</option><option value="mix">現金+カード</option></select>
+          </div>
+          <div><div class="fi-lbl">備考</div><input class="fi" id="rv-note" placeholder="特記事項"></div>
+          <button class="btn btn-gold" onclick="saveReservation()">登録する</button>
+        </div>
+      </div>
     </div>
 
     <!-- 店舗：キャスト管理 -->
@@ -357,11 +467,111 @@ tr:last-child td{border-bottom:none}
     <button class="tbar-btn on cast-tab" onclick="tab('shift')"><span class="tbar-icon">📅</span>シフト申請</button>
     <button class="tbar-btn cast-tab" onclick="tab('shift-list')"><span class="tbar-icon">📋</span>シフト一覧</button>
     <button class="tbar-btn cast-tab" onclick="tab('salary')"><span class="tbar-icon">💴</span>委託金確認</button>
+    <button class="tbar-btn cast-tab" onclick="tab('cast-memo')"><span class="tbar-icon">📝</span>接客メモ</button>
     <!-- 店舗用 -->
     <button class="tbar-btn owner-tab" onclick="tab('owner-shift')"><span class="tbar-icon">📋</span>シフト管理</button>
     <button class="tbar-btn owner-tab" onclick="tab('today')"><span class="tbar-icon">🏠</span>本日</button>
     <button class="tbar-btn owner-tab" onclick="tab('owner-salary')"><span class="tbar-icon">💰</span>委託金精算</button>
     <button class="tbar-btn owner-tab" onclick="tab('owner-cast')"><span class="tbar-icon">👥</span>キャスト</button>
+    <button class="tbar-btn owner-tab" onclick="tab('owner-customer')"><span class="tbar-icon">👤</span>顧客</button>
+  </div>
+</div>
+
+<!-- ===== 顧客詳細シート ===== -->
+<div class="overlay" id="customer-detail-overlay" style="display:none">
+  <div class="sheet">
+    <div class="sheet-hdr">
+      <div class="sheet-title" id="customer-detail-title">顧客詳細</div>
+      <button class="close-btn" onclick="closeSheet('customer-detail')">✕</button>
+    </div>
+    <div id="customer-detail-body" style="padding:.5rem 0"></div>
+  </div>
+</div>
+
+<!-- ===== 顧客追加シート ===== -->
+<div class="overlay" id="add-customer-overlay" style="display:none">
+  <div class="sheet">
+    <div class="sheet-hdr">
+      <div class="sheet-title">顧客追加</div>
+      <button class="close-btn" onclick="closeSheet('add-customer')">✕</button>
+    </div>
+    <div class="field"><label>顧客番号</label><input id="new-cust-no" type="number" placeholder="自動採番" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+    <div class="field"><label>名前</label><input id="new-cust-name" type="text" placeholder="例：ヤマダ様" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+    <div class="field"><label>電話番号</label><input id="new-cust-phone" type="tel" placeholder="090-0000-0000" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+    <div class="field"><label>メモ</label><textarea id="new-cust-memo" rows="3" placeholder="特記事項など" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);resize:none"></textarea></div>
+    <button class="btn btn-gold" style="width:100%;margin-top:.5rem" onclick="saveNewCustomer()">登録</button>
+  </div>
+</div>
+
+<!-- ===== キャストメモシート ===== -->
+<div class="overlay" id="cast-memo-overlay" style="display:none">
+  <div class="sheet">
+    <div class="sheet-hdr">
+      <div class="sheet-title" id="cast-memo-title">接客メモ</div>
+      <button class="close-btn" onclick="closeSheet('cast-memo')">✕</button>
+    </div>
+    <div id="cast-memo-list" style="margin-bottom:.75rem;max-height:200px;overflow-y:auto"></div>
+    <div class="field"><label>新しいメモを追加</label><textarea id="cast-memo-input" rows="4" placeholder="施術の好み、会話の話題、注意点など" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);resize:none"></textarea></div>
+    <button class="btn btn-gold" style="width:100%;margin-top:.5rem" onclick="saveCastMemo()">メモを保存</button>
+  </div>
+</div>
+
+<!-- ===== 予約登録シート ===== -->
+<div class="overlay" id="reservation-overlay" style="display:none">
+  <div class="sheet">
+    <div class="sheet-hdr">
+      <div class="sheet-title" id="reservation-title">予約登録</div>
+      <button class="close-btn" onclick="closeSheet('reservation')">✕</button>
+    </div>
+    <input type="hidden" id="res-shift-id">
+    <div class="field">
+      <label>顧客番号</label>
+      <div style="display:flex;gap:.5rem">
+        <input id="res-cust-no" type="number" placeholder="番号" style="width:90px;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)">
+        <button class="btn btn-blue btn-sm2" onclick="lookupCustomer()">検索</button>
+        <div id="res-cust-name-display" style="flex:1;padding:.5rem;font-size:.85rem;color:var(--text3);align-self:center"></div>
+      </div>
+    </div>
+    <div class="field"><label>お客様名</label><input id="res-cust-name" type="text" placeholder="例：ヤマダ様" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+    <div class="field"><label>来店区分</label>
+      <select id="res-is-new" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)">
+        <option value="false">再来</option>
+        <option value="true">新規</option>
+      </select>
+    </div>
+    <div class="field"><label>指名区分</label>
+      <select id="res-shimei" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)">
+        <option value="">フリー</option>
+        <option value="ネット指名">ネット指名</option>
+        <option value="本指名">本指名</option>
+      </select>
+    </div>
+    <div class="field"><label>コース</label>
+      <select id="res-course" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)">
+        <option value="50分">50分</option>
+        <option value="80分">80分</option>
+        <option value="100分">100分</option>
+        <option value="130分">130分</option>
+        <option value="延長">延長</option>
+      </select>
+    </div>
+    <div class="field"><label>オプション（複数可）</label>
+      <div style="display:flex;flex-direction:column;gap:.3rem">
+        <label style="font-size:.83rem"><input type="checkbox" value="極液"> 極液</label>
+        <label style="font-size:.83rem"><input type="checkbox" value="衣装チェンジ①"> 衣装チェンジ①</label>
+        <label style="font-size:.83rem"><input type="checkbox" value="衣装チェンジ②"> 衣装チェンジ②</label>
+      </div>
+    </div>
+    <div class="field"><label>割引</label><input id="res-discount" type="text" placeholder="例：初回割引" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+    <div class="field"><label>支払い方法</label>
+      <select id="res-payment" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)">
+        <option value="cash">現金</option>
+        <option value="card">カード</option>
+        <option value="mixed">現金+カード</option>
+      </select>
+    </div>
+    <div class="field"><label>メモ</label><textarea id="res-memo" rows="2" style="width:100%;padding:.5rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);resize:none"></textarea></div>
+    <button class="btn btn-gold" style="width:100%;margin-top:.5rem" onclick="saveReservation()">予約を登録</button>
   </div>
 </div>
 
@@ -629,9 +839,14 @@ function fmt(n){return '¥'+Math.round(n||0).toLocaleString()}
 function addMonth(y,d){const[yr,m]=y.split('-').map(Number);const nd=new Date(yr,m-1+d,1);return nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')}
 function nextYM(y){return addMonth(y,1)}
 function jpDate(s){const[y,m,d]=s.split('-');return parseInt(m)+'月'+parseInt(d)+'日'}
-function today(){const d=new Date();const jst=new Date(d.getTime()+9*60*60*1000);return jst.toISOString().slice(0,10)}
+function today(){const d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10)}
 function toast(msg,dur=1800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),dur)}
-function closeSheet(id){document.getElementById(id+'-overlay').classList.remove('on')}
+function closeSheet(id){
+  const el=document.getElementById(id+'-overlay')
+  if(!el)return
+  el.classList.remove('on')
+  el.style.display=''
+}
 
 // ── ログイン ──
 function showLogin(type){
@@ -718,7 +933,7 @@ function salTab(mode){
 function tab(name){
   document.querySelectorAll('.tbar-btn').forEach(b=>b.classList.remove('on'))
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'))
-  const map={'shift':'.cast-tab:nth-child(1)','shift-list':'.cast-tab:nth-child(2)','salary':'.cast-tab:nth-child(3)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)'}
+  const map={'shift':'.cast-tab:nth-child(1)','shift-list':'.cast-tab:nth-child(2)','salary':'.cast-tab:nth-child(3)','cast-memo':'.cast-tab:nth-child(4)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)','owner-customer':'.owner-tab:nth-child(5)'}
   document.querySelector(map[name])?.classList.add('on')
   document.getElementById('p-'+name)?.classList.add('on')
   if(name==='shift')        loadCal()
@@ -726,6 +941,9 @@ function tab(name){
   if(name==='salary')       loadMySalary()
   if(name==='owner-shift')  loadOwnerCal()
   if(name==='today')        loadToday()
+  if(name==='cast-memo')      loadCastMemoPage()
+  if(name==='cast-memo')     loadCastMemoList()
+  if(name==='owner-customer') loadCustomers()
   if(name==='owner-salary') loadOwnerSalary()
   if(name==='owner-cast')   loadCastMgmt()
 }
@@ -943,6 +1161,238 @@ async function loadMySalary(){
   if(dailyArea) dailyArea.innerHTML=dailyHtml
 }
 
+
+// ── 顧客管理 ──
+let allCustomers=[]
+let currentCustomerId=null
+
+async function loadCustomers(){
+  const{data}=await sb.from('customers').select('*').order('customer_no')
+  allCustomers=data||[]
+  renderCustomers(allCustomers)
+}
+
+function filterCustomers(){
+  const q=document.getElementById('customer-search').value.trim().toLowerCase()
+  if(!q){renderCustomers(allCustomers);return}
+  const filtered=allCustomers.filter(c=>
+    c.name.toLowerCase().includes(q)||
+    String(c.customer_no).includes(q)||
+    (c.phone||'').includes(q)
+  )
+  renderCustomers(filtered)
+}
+
+function renderCustomers(list){
+  const area=document.getElementById('customer-area')
+  if(!list||!list.length){area.innerHTML='<div class="empty">顧客データがありません</div>';return}
+  let html=''
+  list.forEach(c=>{
+    const banned=c.is_banned?'<span style="font-size:.65rem;background:#f44336;color:#fff;padding:1px 6px;border-radius:99px;margin-left:.4rem">出禁</span>':''
+    html+=`<div class="item" onclick="openCustomerDetail(${c.id})">
+      <div class="ib">
+        <div class="it">No.${c.customer_no}　${c.name}${banned}</div>
+        <div class="is">${c.phone||'電話番号未登録'}</div>
+      </div>
+      <div class="ic">›</div>
+    </div>`
+  })
+  area.innerHTML=html
+}
+
+async function openCustomerDetail(id){
+  currentCustomerId=id
+  const c=allCustomers.find(x=>x.id===id)
+  if(!c)return
+  document.getElementById('customer-detail-title').textContent=`No.${c.customer_no} ${c.name}`
+  document.getElementById('customer-detail-overlay').classList.add('on')
+  document.getElementById('customer-detail-body').innerHTML='<div class="spin">読み込み中...</div>'
+  
+  // 来店記録取得
+  const{data:visits}=await sb.from('customer_visits').select('*').eq('customer_id',id).order('visit_date',{ascending:false})
+  // キャストメモ取得
+  const{data:memos}=await sb.from('customer_visits').select('cast_memo,cast_name,created_at').eq('customer_id',id).neq('cast_memo','').order('created_at',{ascending:false})
+  
+  const banned=c.is_banned?'出禁':'通常'
+  let html=`
+    <div class="card" style="margin-bottom:.6rem">
+      <div class="field"><label>名前</label><input id="edit-cust-name" value="${c.name}" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+      <div class="field"><label>電話番号</label><input id="edit-cust-phone" value="${c.phone||''}" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+      <div class="field"><label>NGキャスト</label><input id="edit-cust-ng" value="${c.ng_casts||''}" placeholder="例：はな、るあ" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
+      <div class="field"><label>メモ</label><textarea id="edit-cust-memo" rows="2" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);resize:none">${c.memo||''}</textarea></div>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem">
+        <button class="btn btn-gold btn-sm2" style="flex:1" onclick="saveCustomerEdit(${c.id})">保存</button>
+        <button class="btn ${c.is_banned?'btn-green':'btn-red'} btn-sm2" style="flex:1" onclick="toggleBan(${c.id},${!c.is_banned})">${c.is_banned?'出禁解除':'出禁にする'}</button>
+      </div>
+    </div>
+    <div class="sec">来店記録（${(visits||[]).length}回）</div>`
+  
+  if(!visits||!visits.length){
+    html+='<div class="empty">来店記録なし</div>'
+  } else {
+    visits.forEach(v=>{
+      html+=`<div class="item" style="flex-direction:column;align-items:stretch">
+        <div style="font-size:.83rem;font-weight:600">${v.visit_date||''}</div>
+        <div style="font-size:.78rem;color:var(--text3)">${v.cast_name||''} / ${v.shimei_type||'フリー'} / ${v.course||''} ${v.options?'/ '+v.options:''}</div>
+        ${v.cast_memo?`<div style="font-size:.75rem;color:var(--accent);margin-top:.2rem">📝 ${v.cast_memo}</div>`:''}
+      </div>`
+    })
+  }
+  
+  html+=`<div class="sec" style="margin-top:.75rem">キャストメモ</div>
+    <button class="btn btn-purple btn-sm2" style="width:100%;margin-bottom:.5rem" onclick="openCastMemoSheet(${c.id},'${c.name}')">＋ メモを追加</button>`
+  
+  if(memos&&memos.length){
+    memos.forEach(m=>{
+      if(!m.cast_memo)return
+      html+=`<div class="card" style="margin-bottom:.4rem">
+        <div style="font-size:.75rem;color:var(--text3);margin-bottom:.2rem">${m.cast_name||''}　${m.created_at?.slice(0,10)||''}</div>
+        <div style="font-size:.83rem">${m.cast_memo}</div>
+      </div>`
+    })
+  } else {
+    html+='<div class="empty">メモなし</div>'
+  }
+  
+  document.getElementById('customer-detail-body').innerHTML=html
+}
+
+async function saveCustomerEdit(id){
+  const name=document.getElementById('edit-cust-name').value.trim()
+  const phone=document.getElementById('edit-cust-phone').value.trim()
+  const ng=document.getElementById('edit-cust-ng').value.trim()
+  const memo=document.getElementById('edit-cust-memo').value.trim()
+  const{error}=await sb.from('customers').update({name,phone,ng_casts:ng,memo}).eq('id',id)
+  if(error){toast('エラー: '+error.message);return}
+  toast('保存しました')
+  await loadCustomers()
+  const updated=allCustomers.find(x=>x.id===id)
+  if(updated)openCustomerDetail(id)
+}
+
+async function toggleBan(id,ban){
+  if(ban&&!confirm('出禁にしますか？')){return}
+  const{error}=await sb.from('customers').update({is_banned:ban}).eq('id',id)
+  if(error){toast('エラー: '+error.message);return}
+  toast(ban?'出禁にしました':'出禁を解除しました')
+  await loadCustomers()
+  openCustomerDetail(id)
+}
+
+function openAddCustomer(){
+  document.getElementById('new-cust-no').value=''
+  document.getElementById('new-cust-name').value=''
+  document.getElementById('new-cust-phone').value=''
+  document.getElementById('new-cust-memo').value=''
+  document.getElementById('add-customer-overlay').classList.add('on')
+}
+
+async function saveNewCustomer(){
+  const name=document.getElementById('new-cust-name').value.trim()
+  if(!name){toast('名前を入力してください');return}
+  const noVal=document.getElementById('new-cust-no').value
+  let no=noVal?parseInt(noVal):null
+  if(!no){
+    // 自動採番
+    const maxNo=allCustomers.reduce((m,c)=>Math.max(m,c.customer_no||0),0)
+    no=maxNo+1
+  }
+  const phone=document.getElementById('new-cust-phone').value.trim()
+  const memo=document.getElementById('new-cust-memo').value.trim()
+  const{error}=await sb.from('customers').insert({customer_no:no,name,phone,memo})
+  if(error){toast('エラー: '+error.message);return}
+  toast('登録しました')
+  closeSheet('add-customer')
+  loadCustomers()
+}
+
+let castMemoCustomerId=null
+function openCastMemoSheet(custId,custName){
+  castMemoCustomerId=custId
+  document.getElementById('cast-memo-title').textContent=`${custName} へのメモ`
+  document.getElementById('cast-memo-input').value=''
+  document.getElementById('cast-memo-overlay').classList.add('on')
+}
+
+async function saveCastMemo(){
+  const memo=document.getElementById('cast-memo-input').value.trim()
+  if(!memo){toast('メモを入力してください');return}
+  const{error}=await sb.from('customer_visits').insert({
+    customer_id:castMemoCustomerId,
+    cast_name:me.name,
+    cast_memo:memo,
+    visit_date:today()
+  })
+  if(error){toast('エラー: '+error.message);return}
+  toast('メモを保存しました')
+  closeSheet('cast-memo')
+  if(currentCustomerId===castMemoCustomerId)openCustomerDetail(castMemoCustomerId)
+}
+
+// ── 予約管理 ──
+function openReservation(shiftId,castName,date){
+  document.getElementById('res-shift-id').value=shiftId
+  document.getElementById('reservation-title').textContent=`${castName} ${date} 予約登録`
+  document.getElementById('res-cust-no').value=''
+  document.getElementById('res-cust-name').value=''
+  document.getElementById('res-cust-name-display').textContent=''
+  document.getElementById('res-is-new').value='false'
+  document.getElementById('res-shimei').value=''
+  document.getElementById('res-course').value='80分'
+  document.getElementById('res-discount').value=''
+  document.getElementById('res-payment').value='cash'
+  document.getElementById('res-memo').value=''
+  document.querySelectorAll('#reservation-overlay input[type=checkbox]').forEach(cb=>cb.checked=false)
+  document.getElementById('reservation-overlay').classList.add('on')
+}
+
+async function lookupCustomer(){
+  const no=parseInt(document.getElementById('res-cust-no').value)
+  if(!no){return}
+  const c=allCustomers.find(x=>x.customer_no===no)
+  if(c){
+    document.getElementById('res-cust-name').value=c.name
+    document.getElementById('res-cust-name-display').textContent=`✓ ${c.name}`
+    document.getElementById('res-cust-name-display').style.color='var(--green)'
+  } else {
+    document.getElementById('res-cust-name-display').textContent='顧客未登録'
+    document.getElementById('res-cust-name-display').style.color='var(--rtx)'
+  }
+}
+
+async function saveReservation(){
+  const shiftId=parseInt(document.getElementById('res-shift-id').value)
+  const custNo=document.getElementById('res-cust-no').value
+  const custName=document.getElementById('res-cust-name').value.trim()
+  if(!custName){toast('お客様名を入力してください');return}
+  const isNew=document.getElementById('res-is-new').value==='true'
+  const shimei=document.getElementById('res-shimei').value
+  const course=document.getElementById('res-course').value
+  const opts=[...document.querySelectorAll('#reservation-overlay input[type=checkbox]:checked')].map(cb=>cb.value)
+  const discount=document.getElementById('res-discount').value.trim()
+  const payment=document.getElementById('res-payment').value
+  const memo=document.getElementById('res-memo').value.trim()
+  const{error}=await sb.from('reservations').insert({
+    shift_id:shiftId,customer_no:custNo?parseInt(custNo):null,
+    customer_name:custName,is_new:isNew,shimei_type:shimei,
+    course,options:opts.join(','),discounts:discount,payment,memo
+  })
+  if(error){toast('エラー: '+error.message);return}
+  // 顧客の来店記録にも追加
+  if(custNo){
+    const c=allCustomers.find(x=>x.customer_no===parseInt(custNo))
+    if(c){
+      await sb.from('customer_visits').insert({
+        customer_id:c.id,cast_name:'',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
+      })
+    }
+  }
+  toast('予約を登録しました')
+  closeSheet('reservation')
+  loadToday()
+}
+
+
 // ── 店舗：シフト管理 ──
 function ownerCalMove(d){ownerCalMonth=addMonth(ownerCalMonth,d);loadOwnerCal()}
 let ownerShiftData={pending:[],approved:[]}
@@ -1116,8 +1566,7 @@ async function deleteShift(){
 async function loadToday(){
   const td=today();const[y,m,d]=td.split('-')
   document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'
-  const{data:shiftsRaw,error:shiftErr}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
-  if(shiftErr||!shiftsRaw||!shiftsRaw.length){alert('today='+td+' shifts='+(shiftsRaw?shiftsRaw.length:'null')+' err='+(shiftErr?shiftErr.message:'none'))}
+  const{data:shiftsRaw}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
   const{data:castList2}=await sb.from('casts').select('id,name')
   const getName2=id=>{const c=(castList2||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
   const shifts=(shiftsRaw||[]).map(s=>({...s,casts:{name:getName2(s.cast_id)}}))
@@ -1152,6 +1601,7 @@ async function loadToday(){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <button class="btn btn-purple btn-sm2" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム指定</button>
+        <button class="btn btn-blue btn-sm2" onclick="openReservation(${s.id},'${s.casts?.name||'?'}','${td}')">予約登録</button>
         <button class="btn btn-gold btn-sm2" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${td}',${s.cast_id})">委託金入力</button>
       </div>
     </div>`
@@ -1199,7 +1649,6 @@ async function openWorkSheet(shiftId,castName,date,castId){
   calcTotal2()
   document.getElementById('work-overlay').classList.add('on')
 }
-function closeSheet(id){document.getElementById(id+'-overlay').classList.remove('on')}
 
 function addSession(data=null){
   const currentNo=document.querySelectorAll('.session-block').length+1
@@ -1626,6 +2075,8 @@ async function loadOwnerSalary(){
     document.getElementById('o-sales').textContent='¥0'
     document.getElementById('o-back').textContent='¥0'
     document.getElementById('o-count').textContent='0件'
+    document.getElementById('o-cash').textContent='¥0'
+    document.getElementById('o-card').textContent='¥0'
     area.innerHTML='<div class="empty">この月の記録はまだありません</div>'
     return
   }
@@ -1635,6 +2086,36 @@ async function loadOwnerSalary(){
   document.getElementById('o-sales').textContent=fmt(totalSales)
   document.getElementById('o-back').textContent=fmt(totalBack)
   document.getElementById('o-count').textContent=totalCount+'件'
+  // 現金/カード売上を集計
+  let totalCash=0,totalCard=0
+  works.forEach(w=>{
+    const sessions=w.sessions||[]
+    sessions.forEach(s=>{
+      const saleAmt=s.sales||0
+      if(s.pay_course==='カード'||s.pay_shimei==='カード'||s.pay_option==='カード'){
+        // セッション内で一つでもカードがあればカード扱い（簡易）
+        const courseAmt=w.courses?.[0]?.price||0
+        if(s.pay_course==='カード') totalCard+=(s.course_back||0)+(s.sales||0)-(s.course_back||0)
+        else totalCash+=saleAmt
+      } else {
+        totalCash+=saleAmt
+      }
+    })
+    if(!sessions.length){
+      // sessionsがない古いデータ
+      totalCash+=w.sales||0
+    }
+  })
+  // 簡易計算: セッションデータがない場合は全体で計算
+  const realCash=works.reduce((s,w)=>{
+    const ss=w.sessions||[]
+    if(!ss.length) return s+(w.sales||0)
+    return s+ss.filter(x=>x.pay_course!=='カード'&&x.pay_shimei!=='カード'&&x.pay_option!=='カード').reduce((a,x)=>a+(x.sales||0),0)
+  },0)
+  const realCard=totalSales-realCash
+  document.getElementById('o-cash').textContent=fmt(realCash)
+  document.getElementById('o-card').textContent=fmt(realCard)
+
   const bycast={}
   works.forEach(w=>{
     const n=w.casts?.name||'不明'
@@ -1770,6 +2251,78 @@ async function deleteCastShift(){
   await sb.from('shifts').delete().eq('id',castEditShiftId)
   toast('取消しました');closeSheet('cast-shift-edit')
   loadShiftList();loadCal()
+}
+
+
+
+// ── 接客メモ用顧客検索 ──
+function openMemoCustomerSearch(){
+  document.getElementById('memo-cust-search').value=''
+  renderMemoCustomerList()
+  document.getElementById('memo-search-overlay').classList.add('on')
+}
+function renderMemoCustomerList(){
+  const q=document.getElementById('memo-cust-search').value.trim().toLowerCase()
+  const list=q?allCustomers.filter(c=>c.name.toLowerCase().includes(q)||String(c.customer_no).includes(q)):allCustomers
+  const area=document.getElementById('memo-cust-list')
+  if(!list.length){area.innerHTML='<div class="empty">見つかりません</div>';return}
+  area.innerHTML=list.slice(0,30).map(c=>`
+    <div class="item" onclick="closeSheet('memo-search');openCastMemoSheet(${c.id},'${c.name.replace(/'/g,"\'")}')">
+      <div class="ib">
+        <div class="it">No.${c.customer_no}　${c.name}</div>
+        <div class="is">${c.phone||''}</div>
+      </div>
+      <div class="ic">›</div>
+    </div>`).join('')
+}
+
+// ── 接客メモ一覧（キャスト側） ──
+let allMemos=[]
+async function loadCastMemoList(){
+  const area=document.getElementById('cast-memo-area')
+  area.innerHTML='<div class="spin">読み込み中...</div>'
+  const{data:visits}=await sb.from('customer_visits').select('*').order('created_at',{ascending:false})
+  allMemos=visits||[]
+  renderMemos(allMemos)
+}
+function filterMemos(){
+  const q=document.getElementById('memo-search').value.trim().toLowerCase()
+  if(!q){renderMemos(allMemos);return}
+  renderMemos(allMemos.filter(m=>
+    String(m.customer_id).includes(q)||(m.cast_name||'').toLowerCase().includes(q)||(m.cast_memo||'').toLowerCase().includes(q)
+  ))
+}
+function renderMemos(list){
+  const area=document.getElementById('cast-memo-area')
+  if(!list||!list.length){area.innerHTML='<div class="empty">まだメモがありません</div>';return}
+  // 顧客IDでグループ化
+  const byCustomer={}
+  list.forEach(m=>{
+    if(!m.cast_memo)return
+    const cid=m.customer_id
+    if(!byCustomer[cid])byCustomer[cid]=[]
+    byCustomer[cid].push(m)
+  })
+  if(!Object.keys(byCustomer).length){area.innerHTML='<div class="empty">まだメモがありません</div>';return}
+  let html=''
+  // 顧客情報とマッチング
+  Object.entries(byCustomer).forEach(([cid,memos])=>{
+    const cust=allCustomers.find(x=>x.id===parseInt(cid))
+    const custLabel=cust?`No.${cust.customer_no} ${cust.name}`:`顧客ID:${cid}`
+    html+=`<div class="card" style="margin-bottom:.6rem">
+      <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem">${custLabel}</div>`
+    memos.forEach(m=>{
+      html+=`<div style="padding:.35rem 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:.75rem;color:var(--text3)">${m.cast_name||''}　${m.visit_date||m.created_at?.slice(0,10)||''}</div>
+        <div style="font-size:.83rem;margin-top:.15rem">${m.cast_memo||''}</div>
+      </div>`
+    })
+    if(cust){
+      html+=`<button class="btn btn-purple btn-xs" style="margin-top:.4rem;width:100%" onclick="openCastMemoSheet(${cust.id},'${cust.name}')">＋ メモを追加</button>`
+    }
+    html+=`</div>`
+  })
+  area.innerHTML=html
 }
 
 init()
