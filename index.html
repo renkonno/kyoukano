@@ -307,8 +307,8 @@ tr:last-child td{border-bottom:none}
         <button id="sal-tab-daily" onclick="salTab('daily')" style="flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">日別明細</button>
         <button id="sal-tab-total" onclick="salTab('total')" style="flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">月トータル</button>
       </div>
-      <div id="sal-total-area"><div class="spin">読み込み中...</div></div>
-      <div id="sal-daily-area" style="display:none"></div>
+      <div id="sal-total-area" style="display:none"></div>
+      <div id="sal-daily-area"></div>
     </div>
 
     <!-- キャスト：接客メモ -->
@@ -732,6 +732,8 @@ tr:last-child td{border-bottom:none}
 </div>
 
 
+<!-- ===== 割引設定シート（キャストごと） ===== -->
+<div class="overlay" id="disc-overlay">
   <div class="sheet">
     <div class="sh-handle"></div>
     <button class="sh-close" onclick="closeSheet('disc')">✕</button>
@@ -1059,18 +1061,25 @@ async function loadShiftList(){
     const{data:rvs}=await sb.from('reservations').select('shift_id').in('shift_id',approvedShiftIds)
     if(rvs) rvs.forEach(r=>{if(!rvByShift[r.shift_id])rvByShift[r.shift_id]=0;rvByShift[r.shift_id]++})
   }
+  const td=today()
   let html=''
   list.forEach(s=>{
     const rc=getRoomColor(s.room)
     const roomTag=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc.bg};color:${rc.tx};border-color:${rc.bd}">${s.room}</span>`:''
     const rvCount=rvByShift[s.id]||0
-    const rvTag=rvCount>0?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;background:rgba(255,149,0,.15);color:var(--accent);border:1.5px solid var(--accent)">事前予約${rvCount}件</span>`:''
+    const isToday=s.date===td
+    const rvLabel=isToday?'予約':'事前予約'
+    const rvTag=rvCount>0?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;background:rgba(255,149,0,.15);color:var(--accent);border:1.5px solid var(--accent)">${rvLabel}${rvCount}件</span>`:''
+    const rvBtn=s.status==='approved'&&rvCount>0?`<button class="btn btn-gold btn-xs" onclick="openShiftReservations(${s.id},'${me.name||''}')">予約確認</button>`:''
     html+=`<div class="item">
       <div class="ib">
         <div class="it">${jpDate(s.date)}</div>
         <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
         <div class="tags">${roomTag}${rvTag}</div>
-        ${s.status!=='rejected'?`<div style="margin-top:.4rem"><button class="btn btn-gray btn-xs" onclick="openCastShiftEdit(${s.id},'${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正・取消</button></div>`:''}
+        <div style="display:flex;gap:.35rem;margin-top:.4rem;flex-wrap:wrap">
+          ${s.status!=='rejected'?`<button class="btn btn-gray btn-xs" onclick="openCastShiftEdit(${s.id},'${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正・取消</button>`:''}
+          ${rvBtn}
+        </div>
       </div>
       <div class="ir"><span class="tag ${s.status==='approved'?'tb':'tn'}">${s.status==='approved'?'承認済':'申請中'}</span></div>
     </div>`
@@ -1083,12 +1092,15 @@ function salMove(d){salMonth=addMonth(salMonth,d);loadMySalary()}
 async function loadMySalary(){
   const[y,m]=salMonth.split('-').map(Number)
   document.getElementById('sal-title').textContent=y+'年'+m+'月'
-  const{data:works}=await sb.from('works').select('*').eq('cast_id',me.id).gte('date',salMonth+'-01').lt('date',nextYM(salMonth)+'-01').order('date')
+  // 先にdisplay制御（一瞬見えるバグ防止）
   const totalArea=document.getElementById('sal-total-area')
   const dailyArea=document.getElementById('sal-daily-area')
+  if(totalArea) totalArea.style.display='none'
+  if(dailyArea) dailyArea.style.display='none'
+  const{data:works}=await sb.from('works').select('*').eq('cast_id',me.id).gte('date',salMonth+'-01').lt('date',nextYM(salMonth)+'-01').order('date')
   if(!works||!works.length){
-    if(totalArea) totalArea.innerHTML='<div class="empty">この月の記録はまだありません</div>'
-    if(dailyArea) dailyArea.innerHTML=''
+    if(totalArea){totalArea.innerHTML='<div class="empty">この月の記録はまだありません</div>';totalArea.style.display=salTabMode==='total'?'block':'none'}
+    if(dailyArea){dailyArea.innerHTML='';dailyArea.style.display=salTabMode==='daily'?'block':'none'}
     return
   }
   const totalBack=works.reduce((s,w)=>s+(w.back||0),0)
@@ -1138,6 +1150,9 @@ async function loadMySalary(){
     </div>`
   })
   if(dailyArea) dailyArea.innerHTML=dailyHtml
+  // 書き込み後に現在のタブモードで表示切り替え
+  if(totalArea) totalArea.style.display=salTabMode==='total'?'block':'none'
+  if(dailyArea) dailyArea.style.display=salTabMode==='daily'?'block':'none'
 }
 
 
@@ -1330,7 +1345,7 @@ async function openReservation(shiftId,castName,date){
   const{data:courses}=await sb.from('courses').select('*').order('price')
   const sel=document.getElementById('rv-course')
   if(courses&&courses.length){
-    sel.innerHTML=courses.map(c=>`<option value="${c.name}">${c.name}（¥${c.price?.toLocaleString()||''}）</option>`).join('')
+    sel.innerHTML='<option value="">-- コースを選択 --</option>'+courses.map(c=>`<option value="${c.name}">${c.name}（¥${c.price?.toLocaleString()||''}）</option>`).join('')
   }
   // オプション一覧をチェックボックスで表示
   const{data:opts}=await sb.from('options').select('*').order('name')
@@ -1697,16 +1712,16 @@ async function loadToday(){
     }
     html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
       <div class="ib">
-        <div class="it">${s.casts?.name||'?'}</div>
+        <div class="it">${s.casts?.name||'?'} ${intervalMin>0&&shiftRvs.length>0?`<span style="font-size:.65rem;font-weight:400;color:var(--accent);margin-left:.35rem">${(()=>{const lr=shiftRvs.filter(r=>r.checkout_time).sort((a,b)=>b.checkout_time.localeCompare(a.checkout_time))[0];if(lr?.checkout_time){const[hh,mm]=lr.checkout_time.split(':').map(Number);const nmin=(hh*60+mm)+intervalMin;return '⏱'+String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')+'〜'}return ''})()}</span>`:''}</div>
         <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
         <div class="tags">${rt}${rvBadge}</div>
-        ${intervalHtml}
         ${rvListHtml}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <button class="btn btn-purple btn-sm2" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム指定</button>
         <button class="btn btn-blue btn-sm2" onclick="openReservation(${s.id},'${s.casts?.name||'?'}','${td}')">予約登録</button>
-        <button class="btn btn-gold btn-sm2" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${td}',${s.cast_id})">委託金入力</button>
+        <button class="btn btn-gold btn-sm2" onclick="openShiftReservations(${s.id},'${s.casts?.name||'?'}')">予約確認</button>
+        <button class="btn btn-gray btn-sm2" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${td}',${s.cast_id})">委託金入力</button>
       </div>
     </div>`
   })
@@ -1944,7 +1959,6 @@ async function loadCastMgmt(){
       <div class="cast-btns">
         <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">委託金設定</button>
         <button class="btn btn-purple btn-xs" onclick="openCastDiscTypeSheet(${c.id},'${c.name}')">割引種別</button>
-        <button class="btn btn-gold btn-xs" onclick="openCastReservations(${c.id},'${c.name}')">予約確認</button>
         <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
         <button class="btn btn-red btn-xs" onclick="toggleActive(${c.id},true)">退店</button>
       </div>
@@ -2493,20 +2507,23 @@ async function openShiftReservations(shiftId,castName){
   document.getElementById('rv-detail-overlay').classList.add('on')
   document.getElementById('rv-detail-body').innerHTML='<div class="spin">読み込み中...</div>'
   const{data:rvs}=await sb.from('reservations').select('*').eq('shift_id',shiftId).order('checkin_time')
-  const{data:shift}=await sb.from('shifts').select('cast_id').eq('id',shiftId).single()
+  const{data:shift}=await sb.from('shifts').select('cast_id,date').eq('id',shiftId).single()
   let intervalMin=0
   if(shift?.cast_id){const{data:fee}=await sb.from('cast_fees').select('interval_min').eq('cast_id',shift.cast_id).single();intervalMin=fee?.interval_min||0}
   if(!rvs||!rvs.length){document.getElementById('rv-detail-body').innerHTML='<div class="empty">予約はありません</div>';return}
-  let html=`<div style="font-size:.82rem;color:var(--text3);margin-bottom:.6rem">${rvs.length}件の予約</div>`
-  rvs.forEach(r=>{
+  let html=`<div style="font-size:.82rem;color:var(--text3);margin-bottom:.6rem">${shift?.date||''} 計${rvs.length}件</div>`
+  rvs.forEach((r,idx)=>{
     const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
     const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
-    html+=`<div class="card" style="margin-bottom:.5rem">
-      <div style="font-size:.88rem;font-weight:700">${r.checkin_time||''}〜${r.checkout_time||''} ${r.customer_name||''}</div>
-      <div style="font-size:.78rem;color:var(--text3);margin-top:.2rem">${r.shimei_type||'フリー'} / ${r.course||''}</div>
-      ${opts?`<div style="font-size:.75rem;color:var(--text3)">オプション: ${opts}</div>`:''}
-      ${discs?`<div style="font-size:.75rem;color:var(--rtx)">割引: ${discs}</div>`:''}
-      ${r.note?`<div style="font-size:.75rem;color:var(--text3)">備考: ${r.note}</div>`:''}
+    html+=`<div class="item" style="flex-direction:column;align-items:stretch;cursor:pointer" onclick="showReservationDetail(${idx},'shift_${shiftId}')">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <span style="font-size:.75rem;color:var(--text3)">${r.checkin_time?.slice(0,5)||'--:--'}〜${r.checkout_time?.slice(0,5)||'--:--'}</span>
+          <span style="font-size:.92rem;font-weight:700;margin-left:.4rem;color:var(--accent)">${r.customer_name||''}</span>
+        </div>
+        <span style="font-size:.7rem;color:var(--text3)">詳細 ›</span>
+      </div>
+      <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">${r.shimei_type||'フリー'} / ${r.course||''}</div>
     </div>`
   })
   if(intervalMin>0){
@@ -2515,10 +2532,42 @@ async function openShiftReservations(shiftId,castName){
       const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
       const nmin=(hh*60+mm)+intervalMin
       const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
-      html+=`<div style="font-size:.78rem;color:var(--accent);padding:.4rem;background:rgba(255,149,0,.1);border-radius:8px">⏱ 次予約最短: ${nt}〜（インターバル${intervalMin}分）</div>`
+      html+=`<div style="font-size:.78rem;color:var(--accent);padding:.4rem;background:rgba(255,149,0,.1);border-radius:8px;margin-top:.5rem">⏱ 次予約最短: ${nt}〜（インターバル${intervalMin}分）</div>`
     }
   }
+  // reservationキャッシュ保存
+  window._rvDetailCache=window._rvDetailCache||{}
+  window._rvDetailCache[`shift_${shiftId}`]=rvs
   document.getElementById('rv-detail-body').innerHTML=html
+}
+
+function showReservationDetail(idx,cacheKey){
+  const rvs=window._rvDetailCache?.[cacheKey]
+  if(!rvs||!rvs[idx])return
+  const r=rvs[idx]
+  const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
+  const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
+  const payMap={cash:'現金',card:'カード',mix:'現金+カード'}
+  const detail=`
+    <div style="font-size:1rem;font-weight:700;margin-bottom:.75rem">📋 予約詳細</div>
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div><div style="font-size:.95rem;font-weight:700">${r.customer_name||'-'}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div><div style="font-size:.9rem;font-weight:600">${r.checkin_time?.slice(0,5)||'-'}</div></div>
+        <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div><div style="font-size:.9rem;font-weight:600">${r.checkout_time?.slice(0,5)||'-'}</div></div>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再来'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div><div>${r.shimei_type||'フリー'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
+      ${opts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${opts}</div></div>`:''}
+      ${discs?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">割引</div><div style="color:var(--rtx)">${discs}</div></div>`:''}
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div><div>${payMap[r.payment]||r.payment||'-'}</div></div>
+      ${r.note?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div><div>${r.note}</div></div>`:''}
+    </div>
+    <button class="btn btn-gray btn-full" style="margin-top:.75rem" onclick="document.getElementById('rv-detail-body').innerHTML=window._rvDetailBodyCache||''; window._rvDetailBodyCache=null">← 一覧に戻る</button>
+  `
+  window._rvDetailBodyCache=document.getElementById('rv-detail-body').innerHTML
+  document.getElementById('rv-detail-body').innerHTML=detail
 }
 
 // ── 予約確認シート（キャストID指定） ──
