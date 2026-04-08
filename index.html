@@ -44,11 +44,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .back-btn{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text3);padding:.2rem .5rem;margin-bottom:1.5rem;display:block}
 
 /* APP SHELL */
-.app-hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.app-hdr{background:var(--marble) center/cover;border-bottom:1px solid rgba(255,255,255,0.3);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .app-logo{font-family:Georgia,serif;font-size:1rem;letter-spacing:.2em;color:var(--accent)}
 .hdr-r{display:flex;align-items:center;gap:.5rem}
-.badge{font-size:.72rem;padding:3px 10px;border-radius:99px;background:var(--accent-f);color:var(--accent);font-weight:600}
-.btn-sm{font-size:.72rem;color:var(--text3);background:var(--surface2);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit}
+.badge{font-size:.72rem;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,0.85);color:var(--accent);font-weight:600}
+.btn-sm{font-size:.72rem;color:var(--text);background:rgba(255,255,255,0.85);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit}
 
 /* TAB BAR */
 .tbar{display:flex;background:var(--surface);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;z-index:50;padding-bottom:env(safe-area-inset-bottom);overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -488,13 +488,10 @@ tr:last-child td{border-bottom:none}
             <div><div class="fi-lbl">退室時間</div><input class="fi" id="rv-checkout" type="time"></div>
           </div>
           <div><div class="fi-lbl">オプション（複数選択可）</div>
-            <select class="fi" id="rv-options-list" multiple style="height:auto;min-height:44px;padding:.4rem .9rem"></select>
-            <div style="font-size:.7rem;color:var(--text3);margin-top:.25rem">複数選択：長押しまたはCtrl+クリック</div>
+            <div id="rv-options-list" style="display:flex;flex-direction:column;gap:.35rem;padding:.5rem .9rem;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);min-height:44px"></div>
           </div>
-          <div><div class="fi-lbl">割引</div>
-            <select class="fi" id="rv-discount">
-              <option value="">なし</option>
-            </select>
+          <div><div class="fi-lbl">割引（複数選択可）</div>
+            <div id="rv-discount-list" style="display:flex;flex-direction:column;gap:.35rem;padding:.5rem .9rem;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);min-height:44px"></div>
           </div>
           <div><div class="fi-lbl">支払い方法</div>
             <select class="fi" id="rv-payment"><option value="cash">現金</option><option value="card">カード</option><option value="mix">現金+カード</option></select>
@@ -587,6 +584,11 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②バック</div><input type="number" class="fee-input" id="f-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveFee()" id="btn-save-fee" style="margin-bottom:.75rem">保存する</button>
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-bottom:.75rem">
+      <div class="fee-sec-title">⏱ インターバル設定</div>
+      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">最終退室後の次予約最短時間</div>
+      <div class="fee-row"><div class="fee-lbl">インターバル</div><input type="number" class="fee-input" id="f-interval" min="0" step="5" value="0" placeholder="0"><span class="fee-unit">分</span></div>
+    </div>
     <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-bottom:.75rem">
       <div class="fee-sec-title">💰 雑費自動計算設定</div>
       <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">施術本数に応じて雑費を自動計算します</div>
@@ -1015,15 +1017,24 @@ async function loadShiftList(){
   const list=[...myShifts.filter(s=>s.status==='approved'),...myShifts.filter(s=>s.status==='requested')].sort((a,b)=>a.date.localeCompare(b.date))
   const area=document.getElementById('shift-list-area')
   if(!list.length){area.innerHTML='<div class="empty">この月のシフトはありません</div>';return}
+  // 承認済みシフトの予約件数を取得
+  const approvedShiftIds=myShifts.filter(s=>s.status==='approved').map(s=>s.id)
+  let rvByShift={}
+  if(approvedShiftIds.length){
+    const{data:rvs}=await sb.from('reservations').select('shift_id').in('shift_id',approvedShiftIds)
+    if(rvs) rvs.forEach(r=>{if(!rvByShift[r.shift_id])rvByShift[r.shift_id]=0;rvByShift[r.shift_id]++})
+  }
   let html=''
   list.forEach(s=>{
     const rc=getRoomColor(s.room)
     const roomTag=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc.bg};color:${rc.tx};border-color:${rc.bd}">${s.room}</span>`:''
+    const rvCount=rvByShift[s.id]||0
+    const rvTag=rvCount>0?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;background:rgba(255,149,0,.15);color:var(--accent);border:1.5px solid var(--accent)">事前予約${rvCount}件</span>`:''
     html+=`<div class="item">
       <div class="ib">
         <div class="it">${jpDate(s.date)}</div>
         <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
-        <div class="tags">${roomTag}</div>
+        <div class="tags">${roomTag}${rvTag}</div>
         ${s.status!=='rejected'?`<div style="margin-top:.4rem"><button class="btn btn-gray btn-xs" onclick="openCastShiftEdit(${s.id},'${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正・取消</button></div>`:''}
       </div>
       <div class="ir"><span class="tag ${s.status==='approved'?'tb':'tn'}">${s.status==='approved'?'承認済':'申請中'}</span></div>
@@ -1146,17 +1157,19 @@ async function openCustomerDetail(id){
   // キャストメモ取得
   const{data:memos}=await sb.from('customer_visits').select('cast_memo,cast_name,created_at').eq('customer_id',id).neq('cast_memo','').order('created_at',{ascending:false})
   
-  const banned=c.is_banned?'出禁':'通常'
   let html=`
-    <div class="card" style="margin-bottom:.6rem">
-      <div class="field"><label>名前</label><input id="edit-cust-name" value="${c.name}" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
-      <div class="field"><label>電話番号</label><input id="edit-cust-phone" value="${c.phone||''}" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
-      <div class="field"><label>NGキャスト</label><input id="edit-cust-ng" value="${c.ng_casts||''}" placeholder="例：はな、るあ" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text)"></div>
-      <div class="field"><label>メモ</label><textarea id="edit-cust-memo" rows="2" style="width:100%;padding:.4rem;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);resize:none">${c.memo||''}</textarea></div>
-      <div style="display:flex;gap:.5rem;margin-top:.5rem">
-        <button class="btn btn-gold btn-sm2" style="flex:1" onclick="saveCustomerEdit(${c.id})">保存</button>
-        <button class="btn ${c.is_banned?'btn-green':'btn-red'} btn-sm2" style="flex:1" onclick="toggleBan(${c.id},${!c.is_banned})">${c.is_banned?'出禁解除':'出禁にする'}</button>
+    <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1rem">
+      <div><div class="fi-lbl">名前</div><input class="fi" id="edit-cust-name" value="${c.name}"></div>
+      <div><div class="fi-lbl">電話番号</div><input class="fi" id="edit-cust-phone" type="tel" value="${c.phone||''}" placeholder="090-0000-0000"></div>
+      <div><div class="fi-lbl">NGキャスト</div><input class="fi" id="edit-cust-ng" value="${c.ng_casts||''}" placeholder="例：はな、るあ"></div>
+      <div><div class="fi-lbl">出禁</div>
+        <select class="fi" id="edit-cust-banned">
+          <option value="false" ${!c.is_banned?'selected':''}>通常</option>
+          <option value="true" ${c.is_banned?'selected':''}>出禁</option>
+        </select>
       </div>
+      <div><div class="fi-lbl">メモ</div><textarea class="fi" id="edit-cust-memo" rows="3" placeholder="特記事項など">${c.memo||''}</textarea></div>
+      <button class="btn btn-gold" onclick="saveCustomerEdit(${c.id})">保存する</button>
     </div>
     <div class="sec">来店記録（${(visits||[]).length}回）</div>`
   
@@ -1195,7 +1208,9 @@ async function saveCustomerEdit(id){
   const phone=document.getElementById('edit-cust-phone').value.trim()
   const ng=document.getElementById('edit-cust-ng').value.trim()
   const memo=document.getElementById('edit-cust-memo').value.trim()
-  const{error}=await sb.from('customers').update({name,phone,ng_casts:ng,memo}).eq('id',id)
+  const bannedEl=document.getElementById('edit-cust-banned')
+  const ban=bannedEl?bannedEl.value==='true':false
+  const{error}=await sb.from('customers').update({name,phone,ng_casts:ng,memo,is_banned:ban}).eq('id',id)
   if(error){toast('エラー: '+error.message);return}
   toast('保存しました')
   await loadCustomers()
@@ -1272,7 +1287,6 @@ async function openReservation(shiftId,castName,date){
   document.getElementById('rv-cust-name').textContent=''
   document.getElementById('rv-is-new').value='false'
   document.getElementById('rv-shimei').value=''
-  document.getElementById('rv-discount').value=''
   document.getElementById('rv-payment').value='cash'
   document.getElementById('rv-note').value=''
   document.getElementById('rv-checkin').value=''
@@ -1283,28 +1297,26 @@ async function openReservation(shiftId,castName,date){
   if(courses&&courses.length){
     sel.innerHTML=courses.map(c=>`<option value="${c.name}">${c.name}（¥${c.price?.toLocaleString()||''}）</option>`).join('')
   }
-  // オプション一覧をロード
+  // オプション一覧をチェックボックスで表示
   const{data:opts}=await sb.from('options').select('*').order('name')
   const optsList=document.getElementById('rv-options-list')
   if(opts&&opts.length){
-    optsList.innerHTML='<option value="">なし</option>'+opts.map(o=>`<option value="${o.name}">${o.name}（¥${(o.price||0).toLocaleString()}）</option>`).join('')
+    optsList.innerHTML=opts.map(o=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-opt-chk" value="${o.name}" style="width:18px;height:18px;accent-color:var(--accent)"><span>${o.name}（¥${(o.price||0).toLocaleString()}）</span></label>`).join('')
   } else {
-    optsList.innerHTML='<option value="">オプションなし</option>'
+    optsList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">オプションなし</div>'
   }
-  // 割引一覧をロード（キャストのcast_discountsから）
-  const discSel=document.getElementById('rv-discount')
-  discSel.innerHTML='<option value="">なし</option>'
+  // 割引一覧をチェックボックスで表示
+  const discList=document.getElementById('rv-discount-list')
   const{data:castData}=await sb.from('casts').select('id').eq('name',castName).single()
   if(castData){
     const{data:discs}=await sb.from('cast_discounts').select('*').eq('cast_id',castData.id)
     if(discs&&discs.length){
-      discs.forEach(d=>{
-        const opt=document.createElement('option')
-        opt.value=d.name
-        opt.textContent=`${d.name}（-¥${(d.amount||0).toLocaleString()}）`
-        discSel.appendChild(opt)
-      })
+      discList.innerHTML=discs.map(d=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-disc-chk" value="${d.name}" style="width:18px;height:18px;accent-color:var(--accent)"><span>${d.name}（-¥${(d.amount||0).toLocaleString()}）</span></label>`).join('')
+    } else {
+      discList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">割引設定なし</div>'
     }
+  } else {
+    discList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">割引なし</div>'
   }
   document.getElementById('reservation-overlay').classList.add('on')
 }
@@ -1361,9 +1373,9 @@ async function saveReservation(){
   const course=document.getElementById('rv-course').value
   const checkin=document.getElementById('rv-checkin').value
   const checkout=document.getElementById('rv-checkout').value
-  const optsSel=document.getElementById('rv-options-list')
-  const opts=[...optsSel.selectedOptions].map(o=>o.value).filter(v=>v)
-  const discount=document.getElementById('rv-discount').value
+  const opts=[...document.querySelectorAll('#rv-options-list .rv-opt-chk:checked')].map(c=>c.value)
+  const discounts=[...document.querySelectorAll('#rv-discount-list .rv-disc-chk:checked')].map(c=>c.value)
+  const discount=discounts.join(',')
   const payment=document.getElementById('rv-payment').value
   const memo=document.getElementById('rv-note').value.trim()
   // 名前に「様」を自動付与
@@ -1402,6 +1414,21 @@ async function loadOwnerCal(){
   const pending=(pendingRaw||[]).map(s=>({...s,casts:{name:getName(s.cast_id)}}))
   const approved=(approvedRaw||[]).map(s=>({...s,casts:{name:getName(s.cast_id)}}))
   ownerShiftData={pending,approved}
+  // 予約件数を取得（承認済みシフトのshift_idに紐づく予約）
+  const approvedIds=(approvedRaw||[]).map(s=>s.id)
+  let reservationByDate={}
+  if(approvedIds.length){
+    const{data:rvs}=await sb.from('reservations').select('shift_id').in('shift_id',approvedIds)
+    if(rvs){
+      // shift_idから日付に変換
+      const shiftDateMap={}
+      ;(approvedRaw||[]).forEach(s=>{shiftDateMap[s.id]=s.date})
+      rvs.forEach(r=>{
+        const d=shiftDateMap[r.shift_id]
+        if(d){if(!reservationByDate[d])reservationByDate[d]=0;reservationByDate[d]++}
+      })
+    }
+  }
 
   // カレンダー描画
   const first=new Date(y,m-1,1).getDay()
@@ -1432,8 +1459,10 @@ async function loadOwnerCal(){
     else if(hasApproved){bg2='var(--gbg)';border2='1.5px solid var(--gbd)';color2='var(--gtx)'}
     if(!color2){color2=dow2===0?'var(--rtx)':dow2===6?'var(--btx)':'var(--text2)'}
     const totalShifts=(pendingDates[ds]||0)+(approvedDates[ds]||0)
+    const rvCount=reservationByDate[ds]||0
     const statusLabel=totalShifts>0?('出勤'+totalShifts):''
-    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.4rem;line-height:1.1">${statusLabel}</span>`:''}</div>`
+    const rvLabel=rvCount>0?`<span style="font-size:.38rem;line-height:1.1;color:var(--accent)">予約${rvCount}</span>`:''
+    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.4rem;line-height:1.1">${statusLabel}</span>`:''} ${rvLabel}</div>`
     cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;font-size:.68rem;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
     col2++
   }
@@ -1587,14 +1616,61 @@ async function loadToday(){
   const area=document.getElementById('today-area')
   if(!shifts||!shifts.length){area.innerHTML='<div class="empty">本日の承認済みシフトはありません</div>';return}
   let html=''
+  // 各シフトの予約を取得
+  const shiftIds=shifts.map(s=>s.id)
+  let rvByShift2={}
+  if(shiftIds.length){
+    const{data:rvs2}=await sb.from('reservations').select('*').in('shift_id',shiftIds).order('checkin_time')
+    if(rvs2) rvs2.forEach(r=>{if(!rvByShift2[r.shift_id])rvByShift2[r.shift_id]=[];rvByShift2[r.shift_id].push(r)})
+  }
+  // インターバル設定を取得（cast_feesのinterval_minカラム）
+  const castIds=[...new Set(shifts.map(s=>s.cast_id))]
+  let intervalBycast={}
+  if(castIds.length){
+    const{data:fees}=await sb.from('cast_fees').select('cast_id,interval_min').in('cast_id',castIds)
+    if(fees) fees.forEach(f=>{intervalBycast[f.cast_id]=f.interval_min||0})
+  }
   shifts.forEach(s=>{
     const rc2=getRoomColor(s.room)
     const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc2.bg};color:${rc2.tx};border-color:${rc2.bd}">${s.room}</span>`:`<span class="tag tr2">ルーム未指定</span>`
+    const shiftRvs=rvByShift2[s.id]||[]
+    const rvBadge=shiftRvs.length>0?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;background:rgba(255,149,0,.15);color:var(--accent);border:1.5px solid var(--accent)">事前予約${shiftRvs.length}件</span>`:''
+    // インターバル計算
+    let intervalHtml=''
+    const intervalMin=intervalBycast[s.cast_id]||0
+    if(intervalMin>0&&shiftRvs.length>0){
+      const lastRv=shiftRvs.filter(r=>r.checkout_time).sort((a,b)=>b.checkout_time.localeCompare(a.checkout_time))[0]
+      if(lastRv&&lastRv.checkout_time){
+        const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
+        const nextMin=(hh*60+mm)+intervalMin
+        const nh=Math.floor(nextMin/60)%24
+        const nm=nextMin%60
+        const nextTime=`${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
+        intervalHtml=`<div style="font-size:.72rem;color:var(--accent);margin-top:.2rem">⏱ 最短次予約可能：${nextTime}〜（インターバル${intervalMin}分）</div>`
+      }
+    }
+    // 予約一覧
+    let rvListHtml=''
+    if(shiftRvs.length>0){
+      rvListHtml=`<div style="margin-top:.4rem;border-top:1px solid var(--border);padding-top:.4rem">`
+      shiftRvs.forEach(r=>{
+        const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
+        const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
+        rvListHtml+=`<div style="font-size:.78rem;padding:.2rem 0;border-bottom:1px dashed var(--border)">
+          <span style="font-weight:600">${r.checkin_time||''}〜${r.checkout_time||''}</span>
+          <span style="margin-left:.4rem">${r.customer_name||''}</span>
+          <span style="font-size:.7rem;color:var(--text3);margin-left:.4rem">${r.course||''}${opts?' / '+opts:''}${discs?' / 割引:'+discs:''}</span>
+        </div>`
+      })
+      rvListHtml+=`</div>`
+    }
     html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
       <div class="ib">
         <div class="it">${s.casts?.name||'?'}</div>
         <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
-        <div class="tags">${rt}</div>
+        <div class="tags">${rt}${rvBadge}</div>
+        ${intervalHtml}
+        ${rvListHtml}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <button class="btn btn-purple btn-sm2" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム指定</button>
@@ -1653,9 +1729,9 @@ function addSession(data=null){
   const div=document.createElement('div')
   div.className='session-block'
   div.id='session-'+idx
-  const courseOpts=courses.map(c=>`<option value="${c.id}" ${data?.course_id===c.id?'selected':''}>${c.name}</option>`).join('')
+  const courseOpts='<option value="">-- コースを選択 --</option>'+courses.map(c=>`<option value="${c.id}" ${data?.course_id===c.id?'selected':''}>${c.name}</option>`).join('')
   const shimeiTypes=['フリー','ネット指名','本指名']
-  const shimeiOpts=shimeiTypes.map(t=>`<option value="${t}" ${data?.shimei_type===t?'selected':''}>${t}</option>`).join('')
+  const shimeiOpts='<option value="">-- 指名を選択 --</option>'+shimeiTypes.map(t=>`<option value="${t}" ${data?.shimei_type===t?'selected':''}>${t}</option>`).join('')
   const fixedOpts=[{id:'gokueki',name:'極液'},{id:'isho1',name:'衣装チェンジ①'},{id:'isho2',name:'衣装チェンジ②'}]
   const opItems=fixedOpts.map(o=>{
     const checked=data?.options?.some(x=>x.name===o.name)?'checked':''
@@ -1681,9 +1757,9 @@ function addSession(data=null){
     <div style="margin-bottom:.4rem">
       <div class="session-label">支払い方法（コース / 指名 / オプション）</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
-        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course"><option value="現金">💴現金</option><option value="カード">💳カード</option></select></div>
-        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei"><option value="現金">💴現金</option><option value="カード">💳カード</option></select></div>
-        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option"><option value="現金">💴現金</option><option value="カード">💳カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金">現金</option><option value="カード">カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金">現金</option><option value="カード">カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金">現金</option><option value="カード">カード</option></select></div>
       </div>
     </div>
     <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
@@ -1964,6 +2040,9 @@ async function openFeeSheet(castId,name){
   if(misc0El) misc0El.value=f.misc_0??0
   if(misc1El) misc1El.value=f.misc_1??1000
   if(misc3El) misc3El.value=f.misc_3??2000
+  // インターバル設定読み込み
+  const intEl=document.getElementById('f-interval')
+  if(intEl) intEl.value=f.interval_min??0
   document.getElementById('fee-overlay').classList.add('on')
 }
 
@@ -2008,7 +2087,8 @@ async function saveFee(){
     back_50:g('f-b50'),back_80:g('f-b80'),back_100:g('f-b100'),back_130:g('f-b130'),back_ext30:g('f-bext'),
     shimei_free:g('f-shimei-free'),shimei_net:g('f-shimei-net'),shimei_hon:g('f-shimei-hon'),
     op_gokueki:g('f-op1'),op_isho:g('f-op2'),op_isho2:g('f-op3'),
-    misc_enabled:miscEnabled,misc_0:g('f-misc-0'),misc_1:g('f-misc-1'),misc_3:g('f-misc-3')
+    misc_enabled:miscEnabled,misc_0:g('f-misc-0'),misc_1:g('f-misc-1'),misc_3:g('f-misc-3'),
+    interval_min:g('f-interval')
   }
   const{data:ex}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
   if(ex)await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
