@@ -342,6 +342,18 @@ tr:last-child td{border-bottom:none}
       <div id="owner-cal-grid"></div>
       <div style="font-size:.72rem;color:var(--text3);margin:.4rem 0 .25rem">📋 日付をタップして詳細確認・承認できます</div>
       <div id="owner-shift-area" style="margin-top:.25rem"><div class="spin">読み込み中...</div></div>
+      <!-- ガントチャート -->
+      <div style="margin-top:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+          <div style="font-size:.88rem;font-weight:700">📊 ガントチャート（承認済みシフト）</div>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <button class="cal-nav-btn" onclick="ganttMove(-1)">‹</button>
+            <div style="font-size:.8rem;font-weight:600" id="gantt-date-lbl">-</div>
+            <button class="cal-nav-btn" onclick="ganttMove(1)">›</button>
+          </div>
+        </div>
+        <div id="gantt-area"><div class="spin">読み込み中...</div></div>
+      </div>
     </div>
 
     <!-- 店舗：本日状況 -->
@@ -497,7 +509,20 @@ tr:last-child td{border-bottom:none}
             <div id="rv-discount-list" style="display:flex;flex-direction:column;gap:.35rem;padding:.5rem .9rem;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);min-height:44px"></div>
           </div>
           <div><div class="fi-lbl">支払い方法</div>
-            <select class="fi" id="rv-payment"><option value="cash">現金</option><option value="card">カード</option><option value="mix">現金+カード</option></select>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);margin-bottom:.25rem;font-weight:600">コース</div>
+                <select class="fi" id="rv-pay-course" style="padding:.4rem .5rem;font-size:.82rem"><option value="現金">現金</option><option value="カード">カード</option></select>
+              </div>
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);margin-bottom:.25rem;font-weight:600">指名料</div>
+                <select class="fi" id="rv-pay-shimei" style="padding:.4rem .5rem;font-size:.82rem"><option value="現金">現金</option><option value="カード">カード</option></select>
+              </div>
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);margin-bottom:.25rem;font-weight:600">オプション</div>
+                <select class="fi" id="rv-pay-option" style="padding:.4rem .5rem;font-size:.82rem"><option value="現金">現金</option><option value="カード">カード</option></select>
+              </div>
+            </div>
           </div>
           <div><div class="fi-lbl">備考</div><input class="fi" id="rv-note" placeholder="特記事項"></div>
           <button class="btn btn-gold" onclick="saveReservation()">登録する</button>
@@ -933,7 +958,7 @@ function tab(name){
   if(name==='shift')        loadCal()
   if(name==='shift-list')   loadShiftList()
   if(name==='salary')       loadMySalary()
-  if(name==='owner-shift')  loadOwnerCal()
+  if(name==='owner-shift')  {loadOwnerCal();ganttDate=today();loadGantt()}
   if(name==='today')        loadToday()
   if(name==='cast-memo')      loadCastMemoPage()
   if(name==='cast-memo')     loadCastMemoList()
@@ -1146,12 +1171,26 @@ async function loadMySalary(){
     const sessions=w.sessions||[]
     let sessionLines=''
     sessions.forEach((s,i)=>{
-      const parts=[]
-      if(s.course_name) parts.push(s.course_name)
-      if(s.shimei_type) parts.push(s.shimei_type)
-      if(s.options&&s.options.length) s.options.forEach(o=>parts.push(o.name))
-      if(s.discounts&&s.discounts.length) s.discounts.forEach(d=>parts.push('割引:'+d.name))
-      sessionLines+=`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${i+1}本目：${parts.join('：')}</div>`
+      const courseBack=s.course_back||0
+      const shimeiBack=s.shimei_back||0
+      const optBack=s.opt_back||0
+      const sessionNet=courseBack+shimeiBack+optBack
+      let detailRows=''
+      if(s.course_name) detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">コース: ${s.course_name}</span><span>${fmt(courseBack)}</span></div>`
+      if(s.shimei_type) detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">指名: ${s.shimei_type}</span><span>${fmt(shimeiBack)}</span></div>`
+      if(s.options&&s.options.length) s.options.forEach(o=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">OP: ${o.name}</span><span>${fmt(o.back||0)}</span></div>`})
+      if(s.discounts&&s.discounts.length) s.discounts.forEach(d=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--rtx)">割引: ${d.name}</span><span style="color:var(--rtx)">-${fmt(d.amount||0)}</span></div>`})
+      if(s.pay_course||s.pay_shimei||s.pay_option){
+        const pc=s.pay_course||'現金',ps=s.pay_shimei||'現金',po=s.pay_option||'現金'
+        detailRows+=`<div style="font-size:.7rem;color:var(--text3);padding:.1rem 0">支払: コース${pc} / 指名${ps} / OP${po}</div>`
+      }
+      sessionLines+=`<div style="padding:.3rem 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
+          <span style="font-size:.8rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
+          <span style="font-size:.8rem;font-weight:700">${fmt(sessionNet)}</span>
+        </div>
+        ${detailRows}
+      </div>`
     })
     if(!sessions.length){
       const d=(w.details||[]).map(x=>`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${x.name}${x.count>1?'×'+x.count:''}</div>`).join('')
@@ -1364,7 +1403,9 @@ async function openReservation(shiftId,castName,date){
     const{data:custs}=await sb.from('customers').select('*').order('customer_no')
     allCustomers=custs||[]
   }
-  document.getElementById('rv-payment').value='cash'
+  if(document.getElementById('rv-pay-course')) document.getElementById('rv-pay-course').value='現金'
+  if(document.getElementById('rv-pay-shimei')) document.getElementById('rv-pay-shimei').value='現金'
+  if(document.getElementById('rv-pay-option')) document.getElementById('rv-pay-option').value='現金'
   document.getElementById('rv-note').value=''
   document.getElementById('rv-checkin').value=''
   document.getElementById('rv-checkout').value=''
@@ -1448,7 +1489,11 @@ async function saveReservation(){
   const opts=[...document.querySelectorAll('#rv-options-list .rv-opt-chk:checked')].map(c=>c.value)
   const discounts=[...document.querySelectorAll('#rv-discount-list .rv-disc-chk:checked')].map(c=>c.value)
   const discount=discounts.join(',')
-  const payment=document.getElementById('rv-payment').value
+  const payCourse=document.getElementById('rv-pay-course')?.value||'現金'
+  const payShimei=document.getElementById('rv-pay-shimei')?.value||'現金'
+  const payOption=document.getElementById('rv-pay-option')?.value||'現金'
+  // 支払い方法をJSON文字列で保存
+  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOption})
   const memo=document.getElementById('rv-note').value.trim()
   // 名前に「様」を自動付与
   const finalName=custName.endsWith('様')?custName:custName+'様'
@@ -1478,6 +1523,114 @@ async function saveReservation(){
 
 // ── 店舗：シフト管理 ──
 function ownerCalMove(d){ownerCalMonth=addMonth(ownerCalMonth,d);loadOwnerCal()}
+
+// ── ガントチャート ──
+let ganttDate=today()
+function ganttMove(d){
+  const dt=new Date(ganttDate)
+  dt.setDate(dt.getDate()+d)
+  ganttDate=dt.toISOString().slice(0,10)
+  loadGantt()
+}
+async function loadGantt(){
+  const area=document.getElementById('gantt-area')
+  const lbl=document.getElementById('gantt-date-lbl')
+  if(!area) return
+  const[y,m,d]=ganttDate.split('-')
+  if(lbl) lbl.textContent=parseInt(m)+'月'+parseInt(d)+'日'
+  area.innerHTML='<div class="spin">読み込み中...</div>'
+  const{data:shifts}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttDate).eq('status','approved').order('start_time')
+  const{data:rvs}=shifts&&shifts.length
+    ? await sb.from('reservations').select('*').in('shift_id',shifts.map(s=>s.id)).order('checkin_time')
+    : {data:[]}
+  const rvByShift={}
+  ;(rvs||[]).forEach(r=>{if(!rvByShift[r.shift_id])rvByShift[r.shift_id]=[];rvByShift[r.shift_id].push(r)})
+  if(!shifts||!shifts.length){area.innerHTML='<div class="empty">この日の承認済みシフトはありません</div>';return}
+  // 時間→ピクセル変換（11:00〜26:00 = 15時間）
+  const START_H=11,END_H=26,TOTAL_MIN=(END_H-START_H)*60
+  const timeToPos=t=>{
+    if(!t) return null
+    let[h,m]=t.split(':').map(Number)
+    if(h<START_H) h+=24 // 深夜対応
+    return Math.max(0,Math.min(100,((h-START_H)*60+m)/TOTAL_MIN*100))
+  }
+  // 時間軸ラベル
+  const hourLabels=[]
+  for(let h=START_H;h<=END_H;h+=2){
+    const pos=(h-START_H)/(END_H-START_H)*100
+    const label=h>=24?h-24+'時':h+'時'
+    hourLabels.push(`<div style="position:absolute;left:${pos}%;transform:translateX(-50%);font-size:.6rem;color:var(--text3);white-space:nowrap">${label}</div>`)
+  }
+  const hourLines=[]
+  for(let h=START_H;h<=END_H;h++){
+    const pos=(h-START_H)/(END_H-START_H)*100
+    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1px;background:${h%2===0?'rgba(0,0,0,.12)':'rgba(0,0,0,.05)'}"></div>`)
+  }
+  // 現在時刻ライン
+  const now=new Date()
+  const nowH=now.getHours()+(now.getHours()<START_H?24:0)
+  const nowM=now.getMinutes()
+  const nowPos=((nowH-START_H)*60+nowM)/TOTAL_MIN*100
+  const todayStr=today()
+  const nowLine=ganttDate===todayStr&&nowPos>=0&&nowPos<=100
+    ? `<div style="position:absolute;left:${nowPos}%;top:0;bottom:0;width:2px;background:rgba(255,59,48,.7);z-index:10"></div>
+       <div style="position:absolute;left:${nowPos}%;top:-14px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
+    : ''
+  const CAST_COLORS=['#FF6B9D','#9B72CF','#4ECDC4','#FF9A56','#45B7D1','#96CEB4','#F7DC6F','#BB8FCE']
+  let rows=''
+  shifts.forEach((s,si)=>{
+    const startPos=timeToPos(s.start_time?.slice(0,5))
+    const endPos=timeToPos(s.end_time?.slice(0,5))
+    const color=CAST_COLORS[si%CAST_COLORS.length]
+    const shiftW=endPos-startPos
+    const shiftRvs=rvByShift[s.id]||[]
+    // 予約バー
+    let rvBars=''
+    shiftRvs.forEach(r=>{
+      const rStart=timeToPos(r.checkin_time?.slice(0,5))
+      const rEnd=timeToPos(r.checkout_time?.slice(0,5))
+      if(rStart===null||rEnd===null) return
+      const rW=rEnd-rStart
+      if(rW<=0) return
+      rvBars+=`<div title="${r.customer_name||''}\n${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}\n${r.course||''}" style="position:absolute;left:${rStart}%;width:${rW}%;top:2px;bottom:2px;background:rgba(255,149,0,.85);border-radius:3px;z-index:5;cursor:pointer;display:flex;align-items:center;overflow:hidden">
+        <span style="font-size:.52rem;color:#fff;font-weight:700;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.customer_name?.replace('様','')||''}</span>
+      </div>`
+    })
+    // 空き時間バー
+    let freeBars=''
+    const sorted=[...shiftRvs].filter(r=>r.checkin_time&&r.checkout_time).sort((a,b)=>a.checkin_time.localeCompare(b.checkin_time))
+    let prevEnd=s.start_time?.slice(0,5)||''
+    const checkEnd=s.end_time?.slice(0,5)||''
+    ;[...sorted,{checkin_time:checkEnd,checkout_time:checkEnd}].forEach(r=>{
+      const fStart=timeToPos(prevEnd)
+      const fEnd=timeToPos(r.checkin_time?.slice(0,5))
+      if(fStart!==null&&fEnd!==null&&fEnd-fStart>0.5){
+        freeBars+=`<div style="position:absolute;left:${fStart}%;width:${fEnd-fStart}%;top:4px;bottom:4px;background:rgba(52,199,89,.25);border-radius:2px;border:1px dashed rgba(52,199,89,.5);z-index:3"></div>`
+      }
+      prevEnd=r.checkout_time?.slice(0,5)||prevEnd
+    })
+    rows+=`<div style="display:flex;align-items:center;margin-bottom:.5rem;gap:.4rem">
+      <div style="width:60px;min-width:60px;font-size:.72rem;font-weight:700;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.casts?.name||'?'}</div>
+      <div style="flex:1;position:relative;height:28px;background:var(--surface2);border-radius:4px;overflow:visible">
+        ${hourLines.join('')}
+        <div style="position:absolute;left:${startPos}%;width:${shiftW}%;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}55;border-radius:3px;z-index:2"></div>
+        ${freeBars}${rvBars}
+        ${nowLine}
+      </div>
+    </div>`
+  })
+  // 凡例
+  const legend=`<div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem;font-size:.65rem">
+    <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:rgba(255,149,0,.85);border-radius:2px"></div>予約済み</div>
+    <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:rgba(52,199,89,.25);border:1px dashed rgba(52,199,89,.5);border-radius:2px"></div>空き時間</div>
+    ${ganttDate===todayStr?'<div style="display:flex;align-items:center;gap:.25rem"><div style="width:2px;height:10px;background:rgba(255,59,48,.7)"></div>現在時刻</div>':''}
+  </div>`
+  area.innerHTML=`<div style="position:relative;padding-top:18px">
+    <div style="position:relative;height:18px;margin-left:64px;margin-bottom:2px">${hourLabels.join('')}</div>
+    ${rows}
+    ${legend}
+  </div>`
+}
 let ownerShiftData={pending:[],approved:[]}
 async function loadOwnerCal(){
   const[y,m]=ownerCalMonth.split('-').map(Number)
@@ -1647,8 +1800,8 @@ async function ownerSelectDay(ds){
   document.getElementById('owner-shift-detail-overlay').classList.add('on')
 }
 
-async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
-async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal()}
+async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal();loadGantt()}
+async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal();loadGantt()}
 
 function openShiftEdit(id,name,date,start,end,note){
   editShiftId=id
@@ -1664,13 +1817,13 @@ async function saveShiftEdit(){
   const note=document.getElementById('se-note').value
   const{error}=await sb.from('shifts').update({start_time:start,end_time:end,note}).eq('id',editShiftId)
   if(error){toast('エラー: '+error.message);console.error('saveShiftEdit error:',error);return}
-  toast('シフトを訂正しました');closeSheet('shift-edit');loadOwnerCal()
+  toast('シフトを訂正しました');closeSheet('shift-edit');loadOwnerCal();loadGantt()
 }
 async function deleteShift(){
   if(!confirm('このシフトを削除しますか？'))return
   const{error}=await sb.from('shifts').delete().eq('id',editShiftId)
   if(error){toast('エラー: '+error.message);console.error('deleteShift error:',error);return}
-  toast('削除しました');closeSheet('shift-edit');loadOwnerCal()
+  toast('削除しました');closeSheet('shift-edit');loadOwnerCal();loadGantt()
 }
 
 // ── 店舗：本日状況 ──
@@ -1816,10 +1969,38 @@ async function openWorkSheet(shiftId,castName,date,castId){
   if(autoMisc) document.getElementById('w-misc').value=sheetFee.misc_0??0
   else document.getElementById('w-misc').value='0'
   if(w&&w.sessions&&w.sessions.length){
+    // 保存済みデータがあればそれを使う
     if(w.misc) document.getElementById('w-misc').value=w.misc
     w.sessions.forEach(s=>addSession(s))
   } else {
-    addSession()
+    // 予約データから自動生成
+    const{data:rvs}=await sb.from('reservations').select('*').eq('shift_id',shiftId).order('checkin_time')
+    if(rvs&&rvs.length){
+      // 入室時間順にソートして1本目から割り当て
+      const sorted=[...rvs].sort((a,b)=>(a.checkin_time||'').localeCompare(b.checkin_time||''))
+      sorted.forEach(rv=>{
+        // コースをcourses配列から検索
+        const matchedCourse=courses.find(c=>c.name===rv.course)
+        // オプションを解析
+        const opNames=(rv.options||'').split(',').filter(Boolean)
+        const opData=opNames.map(name=>({name}))
+        // 指名区分
+        const shimeiType=rv.shimei_type||'フリー'
+        // 支払い方法を解析
+        let payCourse='現金',payShimei='現金',payOption='現金'
+        try{const pj=JSON.parse(rv.payment||'{}');payCourse=pj.course||'現金';payShimei=pj.shimei||'現金';payOption=pj.option||'現金'}catch(e){}
+        addSession({
+          course_id:matchedCourse?.id||null,
+          shimei_type:shimeiType,
+          options:opData,
+          pay_course:payCourse,
+          pay_shimei:payShimei,
+          pay_option:payOption
+        })
+      })
+    } else {
+      addSession()
+    }
   }
   calcTotal2()
   document.getElementById('work-overlay').classList.add('on')
@@ -1859,9 +2040,9 @@ function addSession(data=null){
     <div style="margin-bottom:.4rem">
       <div class="session-label">支払い方法（コース / 指名 / オプション）</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
-        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金">現金</option><option value="カード">カード</option></select></div>
-        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金">現金</option><option value="カード">カード</option></select></div>
-        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金">現金</option><option value="カード">カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_course||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_course==='カード'?'selected':''}>カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_shimei||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_shimei==='カード'?'selected':''}>カード</option></select></div>
+        <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_option||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_option==='カード'?'selected':''}>カード</option></select></div>
       </div>
     </div>
     <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
@@ -2645,6 +2826,16 @@ function showReservationDetail(idx,cacheKey){
   const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
   const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
   const payMap={cash:'現金',card:'カード',mix:'現金+カード'}
+  // payment がJSON形式かどうか判定
+  let payDisplay='-'
+  try{
+    const pj=JSON.parse(r.payment||'{}')
+    if(pj.course||pj.shimei||pj.option){
+      payDisplay=`コース:${pj.course||'現金'} / 指名:${pj.shimei||'現金'} / OP:${pj.option||'現金'}`
+    } else {
+      payDisplay=payMap[r.payment]||r.payment||'-'
+    }
+  }catch(e){payDisplay=payMap[r.payment]||r.payment||'-'}
   window._rvDetailBodyCache=document.getElementById('rv-detail-body').innerHTML
   window._currentRvId=r.id
   window._currentRvCacheKey=cacheKey
@@ -2693,12 +2884,8 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">割引（登録済）</div>
         <div style="font-size:.85rem;margin-top:.3rem;color:var(--rtx)">${discs||'なし'}</div>
       </div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div>
-        <select id="edit-rv-payment" class="fi2" style="margin-top:.3rem">
-          <option value="cash" ${(r.payment||'cash')==='cash'?'selected':''}>現金</option>
-          <option value="card" ${r.payment==='card'?'selected':''}>カード</option>
-          <option value="mix" ${r.payment==='mix'?'selected':''}>現金+カード</option>
-        </select>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法（登録済）</div>
+        <div style="font-size:.83rem;margin-top:.3rem;color:var(--text3)">${payDisplay}</div>
       </div>
     </div>`:`<div style="display:flex;flex-direction:column;gap:.5rem">
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div><div style="font-size:.95rem;font-weight:700">${r.customer_name||'-'}</div></div>
@@ -2712,7 +2899,7 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
       ${opts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${opts}</div></div>`:''}
       ${discs?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">割引</div><div style="color:var(--rtx)">${discs}</div></div>`:''}
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div><div>${{cash:'現金',card:'カード',mix:'現金+カード'}[r.payment]||r.payment||'-'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div><div style="font-size:.83rem">${payDisplay}</div></div>
       ${r.note?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div><div>${r.note}</div></div>`:''}
     </div>`}
     ${me?.is_owner?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem">
@@ -2770,8 +2957,22 @@ async function saveReservationEdit(rvId,cacheKey){
 
 async function deleteReservation(rvId,cacheKey){
   if(!confirm('この予約を削除しますか？'))return
+  // 削除前に予約情報取得（来店記録削除に使用）
+  const{data:rvToDelete}=await sb.from('reservations').select('*').eq('id',rvId).single()
   const{error}=await sb.from('reservations').delete().eq('id',rvId)
   if(error){toast('エラー: '+error.message);return}
+  // 来店記録も削除（customer_noまたはcustomer_nameで照合）
+  if(rvToDelete){
+    if(rvToDelete.customer_no){
+      const cust=allCustomers.find(x=>x.customer_no===rvToDelete.customer_no)
+      if(cust){
+        await sb.from('customer_visits').delete()
+          .eq('customer_id',cust.id)
+          .eq('visit_date',rvToDelete.checkin_time?.slice(0,10)||today())
+          .eq('cast_name','予約')
+      }
+    }
+  }
   toast('削除しました')
   // キャッシュから削除
   if(window._rvDetailCache?.[cacheKey]){
