@@ -2242,13 +2242,15 @@ async function loadGanttModal(){
   const TIME_H=17  // 時間軸
   const LEGEND_H=18
   const BTN_H=38
-  const ROWS=5
-  const GAP=5
+  const ROWS=5     // 5列想定でROW_H計算
+  const GAP=4
 
-  // 5列分ちょうどのバー高さ
+  // 5行（名前・分数・入室・〜・退室）表示に必要な最低高さ
+  // 各行約12px × 5行 = 60px 以上は必要
+  // ROWS=5列が画面に収まるよう計算し、最低70pxを保証
   const ROW_H=Math.max(
     Math.floor((EH - HDR_H - LEGEND_H - BTN_H - ROWS*(NAME_H+TIME_H+GAP) - GAP) / ROWS),
-    20
+    70  // 5行テキスト表示の最低高さ
   )
   const CHART_W=EW - PAD*2
 
@@ -2316,14 +2318,16 @@ async function loadGanttModal(){
         const minStr=minNum?minNum+'分':''
         const ci=r.checkin_time?.slice(0,5)||''
         const co=r.checkout_time?.slice(0,5)||''
-        // バー高さに合わせてフォントサイズ可変
-        const fsMain=ROW_H>=40?'.6':'.52'
-        const fsSub=ROW_H>=40?'.52':'.45'
+        // ROW_H=70px想定：5行 × line-height≈14px = 70px
+        // 各行高さ = ROW_H / 5 - 1px gap
+        const lineH=Math.max(Math.floor(ROW_H/5)-1, 11)
+        const fsMain=(lineH/16).toFixed(2)  // px→rem換算
+        const fsSub=((lineH*0.88)/16).toFixed(2)
         rvBars+=`<div style="position:absolute;left:${rS}px;width:${bW}px;top:1px;bottom:1px;
           background:linear-gradient(160deg,#FF9A2E,#FF6400);border-radius:5px;z-index:5;
           overflow:hidden;cursor:pointer;box-shadow:0 2px 5px rgba(255,140,0,.35)"
           onclick="closeGanttModal();setTimeout(()=>openReservation(${s.id},'${(s.casts?.name||'').replace(/'/g,"\\\\'")}','${ganttModalDate}'),150)">
-          <div style="padding:1px 3px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:0">
+          <div style="padding:2px 4px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:1px">
             <div style="font-size:${fsMain}rem;color:#fff;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25">${name}</div>
             ${minStr?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.92);line-height:1.2;white-space:nowrap">${minStr}</div>`:''}
             ${ci?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.15;white-space:nowrap">${ci}</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.65);line-height:.9;white-space:nowrap">〜</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.15;white-space:nowrap">${co}</div>`:''}
