@@ -2151,32 +2151,12 @@ function openGanttModal(room){
   ganttModalDate=today()
   document.getElementById('gantt-modal-title').textContent=room+' のガントチャート'
   const ov=document.getElementById('gantt-modal-overlay')
-  // 縦画面の場合はCSS90度回転で横表示
-  _applyGanttLandscape(ov)
+  ov.style.cssText='display:flex;flex-direction:column;position:fixed;inset:0;z-index:9000;background:var(--bg);overflow:hidden'
   loadGanttModal()
 }
 
-function _applyGanttLandscape(ov){
-  const vw=window.innerWidth, vh=window.innerHeight
-  if(vw<vh){
-    // 縦画面 → 90度回転：幅=vh, 高さ=vw
-    ov.style.cssText=`display:flex;flex-direction:column;position:fixed;z-index:9000;background:var(--bg);overflow:hidden;width:${vh}px;height:${vw}px;top:${(vh-vw)/2}px;left:${(vw-vh)/2}px;transform:rotate(90deg);transform-origin:center center`
-  } else {
-    ov.style.cssText='display:flex;flex-direction:column;position:fixed;inset:0;z-index:9000;background:var(--bg);overflow:hidden'
-  }
-}
-
-window.addEventListener('resize',()=>{
-  const ov=document.getElementById('gantt-modal-overlay')
-  if(ov&&ov.style.display!=='none'&&ov.style.transform!==undefined){
-    _applyGanttLandscape(ov)
-    loadGanttModal()
-  }
-})
-
 function closeGanttModal(){
-  const ov=document.getElementById('gantt-modal-overlay')
-  ov.style.cssText='display:none'
+  document.getElementById('gantt-modal-overlay').style.cssText='display:none'
 }
 
 function ganttModalMove(d){
@@ -2215,22 +2195,22 @@ async function loadGanttModal(){
 
   const START_H=11,END_H=26,TOTAL_MIN=(END_H-START_H)*60
 
-  // 横画面時の実効サイズ（CSS回転後）
-  const vw=window.innerWidth, vh=window.innerHeight
-  const isPortrait=vw<vh
-  const EW=isPortrait?vh:vw   // 実効幅
-  const EH=isPortrait?vw:vh   // 実効高さ
-
-  const PAD=10
-  const HDR_H=46   // ヘッダー高さ
-  const TIME_H=20  // 時間軸
+  // 画面サイズ（縦画面そのまま）
+  const SW=window.innerWidth
+  const SH=window.innerHeight
+  const PAD=8
+  const HDR_H=50   // モーダルヘッダー
   const NAME_H=28  // キャスト名行
-  const LEGEND_H=24
+  const TIME_H=18  // 時間軸（キャスト名とバーの間）
+  const LEGEND_H=22
   const BTN_H=44
-  const ROWS=5     // 常に5列想定でバー高さ計算
+  const ROWS=5     // 5列想定でバー高さ計算
   const GAP=6
-  const ROW_H=Math.max(Math.floor((EH-HDR_H-TIME_H-LEGEND_H-BTN_H-GAP*(ROWS+1))/ROWS-NAME_H),32)
-  const CHART_W=EW-PAD*2
+  const ROW_H=Math.max(
+    Math.floor((SH - HDR_H - LEGEND_H - BTN_H - ROWS*(NAME_H+TIME_H+GAP) - GAP) / ROWS),
+    28
+  )
+  const CHART_W=SW-PAD*2
 
   const PX_PER_MIN=CHART_W/TOTAL_MIN
   const timeToPx=t=>{
@@ -2240,12 +2220,15 @@ async function loadGanttModal(){
     return Math.max(0,Math.min(CHART_W,((h-START_H)*60+mn)*PX_PER_MIN))
   }
 
-  // 時間軸（黒・1時間ごと）
-  let hourAxis=''
-  for(let h=START_H;h<=END_H;h++){
-    const px=(h-START_H)*60*PX_PER_MIN
-    const lbl=h>=24?(h-24)+'時':h+'時'
-    hourAxis+=`<div style="position:absolute;left:${px}px;transform:translateX(-50%);font-size:.58rem;color:rgba(0,0,0,.75);font-weight:700;white-space:nowrap">${lbl}</div>`
+  // 時間軸HTML（黒統一・1時間ごと）
+  const makeTimeAxis=()=>{
+    let s=''
+    for(let h=START_H;h<=END_H;h++){
+      const px=(h-START_H)*60*PX_PER_MIN
+      const lbl=h>=24?(h-24)+'時':h+'時'
+      s+=`<div style="position:absolute;left:${px}px;transform:translateX(-50%);font-size:.55rem;color:rgba(0,0,0,.72);font-weight:700;white-space:nowrap">${lbl}</div>`
+    }
+    return s
   }
 
   // グリッドライン（黒統一）
@@ -2262,7 +2245,7 @@ async function loadGanttModal(){
   const nowPx=((nowH-START_H)*60+now.getMinutes())*PX_PER_MIN
   const todayStr=today()
   const nowLine=ganttModalDate===todayStr&&nowPx>=0&&nowPx<=CHART_W
-    ?`<div style="position:absolute;left:${nowPx}px;top:0;bottom:0;width:2px;background:rgba(255,59,48,.9);z-index:20;box-shadow:0 0 4px rgba(255,59,48,.4)"></div><div style="position:absolute;left:${nowPx}px;top:1px;transform:translateX(-50%);font-size:.48rem;color:#ff3b30;font-weight:800;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;z-index:21">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
+    ?`<div style="position:absolute;left:${nowPx}px;top:0;bottom:0;width:2px;background:rgba(255,59,48,.9);z-index:20"></div><div style="position:absolute;left:${nowPx}px;top:1px;transform:translateX(-50%);font-size:.45rem;color:#ff3b30;font-weight:800;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;z-index:21">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
     :''
 
   const CAST_COLORS=['#FF6B9D','#9B72CF','#4ECDC4','#FF9A56','#45B7D1','#96CEB4']
@@ -2281,7 +2264,7 @@ async function loadGanttModal(){
       const color=CAST_COLORS[si%CAST_COLORS.length]
       const shiftRvs=rvByShift[s.id]||[]
 
-      // 予約バー（全情報をバー内に）
+      // 予約バー（名前・分数・時間をバー内に）
       let rvBars=''
       shiftRvs.forEach(r=>{
         const rS=timeToPx(r.checkin_time?.slice(0,5))
@@ -2294,17 +2277,14 @@ async function loadGanttModal(){
         const minStr=minNum?minNum+'分':''
         const ci=r.checkin_time?.slice(0,5)||''
         const co=r.checkout_time?.slice(0,5)||''
-        // ROW_Hに応じてフォントサイズを調整
-        const fs=ROW_H>=50?'.62':ROW_H>=38?'.56':'.5'
-        const fs2=ROW_H>=50?'.54':ROW_H>=38?'.5':'.44'
         rvBars+=`<div style="position:absolute;left:${rS}px;width:${bW}px;top:1px;bottom:1px;
           background:linear-gradient(160deg,#FF9A2E,#FF6400);border-radius:5px;z-index:5;
-          overflow:hidden;cursor:pointer;box-shadow:0 2px 6px rgba(255,140,0,.4)"
+          overflow:hidden;cursor:pointer;box-shadow:0 2px 6px rgba(255,140,0,.35)"
           onclick="closeGanttModal();setTimeout(()=>openReservation(${s.id},'${(s.casts?.name||'').replace(/'/g,"\\\\'")}','${ganttModalDate}'),150)">
           <div style="padding:2px 4px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:0">
-            <div style="font-size:${fs}rem;color:#fff;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${name}</div>
-            ${bW>35&&minStr?`<div style="font-size:${fs2}rem;color:rgba(255,255,255,.92);line-height:1.2;white-space:nowrap">${minStr}</div>`:''}
-            ${bW>60&&ci?`<div style="font-size:${fs2}rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${ci}〜${co}</div>`:''}
+            <div style="font-size:.6rem;color:#fff;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3">${name}</div>
+            ${bW>30&&minStr?`<div style="font-size:.52rem;color:rgba(255,255,255,.92);line-height:1.2;white-space:nowrap">${minStr}</div>`:''}
+            ${bW>55&&ci?`<div style="font-size:.5rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${ci}〜${co}</div>`:''}
           </div>
         </div>`
       })
@@ -2325,14 +2305,24 @@ async function loadGanttModal(){
         :`<span style="font-size:.55rem;color:var(--green);margin-left:.3rem">空き</span>`
 
       rows+=`<div style="margin-bottom:${GAP}px;padding:0 ${PAD}px">
-        <div style="display:flex;align-items:center;gap:.35rem;padding:2px 7px;background:${color}18;border-radius:5px;border-left:3px solid ${color};margin-bottom:1px;height:${NAME_H}px">
+        <!-- キャスト名行 -->
+        <div style="display:flex;align-items:center;gap:.35rem;padding:2px 7px;
+          background:${color}18;border-radius:5px;border-left:3px solid ${color};
+          height:${NAME_H}px;box-sizing:border-box">
           <span style="font-size:.75rem;font-weight:800;color:${color}">${s.casts?.name||'?'}</span>
           <span style="font-size:.58rem;color:var(--text3)">${s.start_time?.slice(0,5)||''}-${s.end_time?.slice(0,5)||''}</span>
           ${rvBadge}
         </div>
-        <div style="position:relative;height:${ROW_H}px;width:${CHART_W}px;background:linear-gradient(to bottom,#f8f9fa,#eef0f3);border-radius:6px;border:1px solid rgba(0,0,0,.09);overflow:visible">
+        <!-- 時間軸（キャスト名とバーの間） -->
+        <div style="position:relative;height:${TIME_H}px;width:${CHART_W}px;overflow:visible">${makeTimeAxis()}</div>
+        <!-- チャートバー -->
+        <div style="position:relative;height:${ROW_H}px;width:${CHART_W}px;
+          background:linear-gradient(to bottom,#f8f9fa,#eef0f3);border-radius:6px;
+          border:1px solid rgba(0,0,0,.09);overflow:visible">
           ${gridHtml}
-          <div style="position:absolute;left:${sP}px;width:${eP-sP}px;top:0;bottom:0;background:${color}18;border-radius:4px;z-index:2;border-left:3px solid ${color};border-right:2px solid ${color}88"></div>
+          <div style="position:absolute;left:${sP}px;width:${eP-sP}px;top:0;bottom:0;
+            background:${color}18;border-radius:4px;z-index:2;
+            border-left:3px solid ${color};border-right:2px solid ${color}88"></div>
           ${freeBars}${rvBars}${nowLine}
         </div>
       </div>`
@@ -2350,10 +2340,7 @@ async function loadGanttModal(){
     ?`<div style="padding:.4rem ${PAD}px 0"><button style="background:linear-gradient(135deg,#4facfe,#00f2fe);color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;padding:.45rem 1.1rem;cursor:pointer;box-shadow:0 2px 8px rgba(79,172,254,.35)" onclick="closeGanttModal();setTimeout(()=>openReservation(${targetShifts[0].id},'${(targetShifts[0].casts?.name||'').replace(/'/g,"\\\\'")}','${ganttModalDate}'),150)">＋ 予約登録</button></div>`
     :''
 
-  // 時間軸ヘッダー（全体で1つ・キャスト名行の上）
-  const timeAxisHtml=`<div style="position:relative;height:${TIME_H}px;padding:0 ${PAD}px;margin-bottom:2px">${hourAxis}</div>`
-
-  area.innerHTML=`${timeAxisHtml}${rows}${legend}${rvBtn}`
+  area.innerHTML=`${rows}${legend}${rvBtn}`
 }
 // ── 委託金入力（セット方式） ──
 async function openWorkSheet(shiftId,castName,date,castId){
