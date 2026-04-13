@@ -3138,10 +3138,12 @@ function renderMemoCustomerList(){
 // ── 接客メモ一覧（キャスト側） ──
 let allMemos=[]
 async function loadCastMemoList(){
+  // allCustomersが空なら先に読み込む（顧客名表示のため）
+  if(!allCustomers||!allCustomers.length) await loadCustomers()
   const{data:visits}=await sb.from('customer_visits').select('*').order('created_at',{ascending:false})
   allMemos=visits||[]
   // 検索バーが空なら非表示のまま
-  const q=document.getElementById('memo-search')?.value.trim().toLowerCase()||''
+  const q=document.getElementById('memo-search')?.value.trim()||''
   if(!q){
     const area=document.getElementById('cast-memo-area')
     area.style.display='none'
@@ -3150,14 +3152,28 @@ async function loadCastMemoList(){
     filterMemos()
   }
 }
+function normalizeStr(s){
+  if(!s)return ''
+  // 全角→半角数字・英字、カタカナ→ひらがな
+  return String(s)
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60))
+    .toLowerCase()
+}
 function filterMemos(){
-  const q=document.getElementById('memo-search').value.trim().toLowerCase()
+  const raw=document.getElementById('memo-search').value.trim()
   const area=document.getElementById('cast-memo-area')
-  if(!q){area.style.display='none';area.innerHTML='';return}
+  if(!raw){area.style.display='none';area.innerHTML='';return}
+  const q=normalizeStr(raw)
   area.style.display='block'
-  renderMemos(allMemos.filter(m=>
-    String(m.customer_id).includes(q)||(m.cast_name||'').toLowerCase().includes(q)||(m.cast_memo||'').toLowerCase().includes(q)
-  ))
+  renderMemos(allMemos.filter(m=>{
+    const cust=allCustomers.find(x=>x.id===parseInt(m.customer_id))
+    const custName=normalizeStr(cust?.name||'')
+    const custNo=String(cust?.customer_no||m.customer_id)
+    const castName=normalizeStr(m.cast_name||'')
+    const memo=normalizeStr(m.cast_memo||'')
+    return custName.includes(q)||custNo.includes(q)||castName.includes(q)||memo.includes(q)
+  }))
 }
 function renderMemos(list){
   const area=document.getElementById('cast-memo-area')
