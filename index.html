@@ -3784,12 +3784,12 @@ function extendReservation(rvId, cacheKey){
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">'
     +'<button class="btn btn-gray" onclick="document.getElementById(\'extend-sheet\').remove()">キャンセル</button>'
-    +'<button class="btn btn-gold" onclick="confirmExtend('+rvId+',\''+cacheKey+'\',\''+newCheckout+'\','+extCount+','+extPrice+')">延長する</button>'
+    +'<button class="btn btn-gold" onclick="confirmExtend('+rvId+',\''+cacheKey+'\',\''+newCheckout+'\','+extCount+','+extPrice+',\''+curCheckout+'\')" >延長する</button>'
     +'</div>'
   document.body.appendChild(sheet)
 }
 
-async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice){
+async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice, prevCheckout){
   const payMethod=document.getElementById('extend-pay-sel')?.value||'現金'
   document.getElementById('extend-sheet')?.remove()
   const rvs=window._rvDetailCache?.[cacheKey]
@@ -3797,7 +3797,8 @@ async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice){
   if(!r)return
   // ブッキングチェック
   const shiftRvs=(rvs||[]).filter(x=>x.id!==rvId&&x.shift_id===r.shift_id&&x.checkin_time)
-  const curCheckout=r.checkout_time.slice(0,5)
+  // checkout_timeがnullの場合は空文字にしてクラッシュを防ぐ
+  const curCheckout=prevCheckout||(r.checkout_time||'').slice(0,5)
   const conflicts=shiftRvs.filter(x=>{
     const xStart=x.checkin_time?.slice(0,5)
     return xStart&&xStart<newCheckout&&(x.checkout_time?.slice(0,5)||'99:99')>curCheckout
@@ -3828,7 +3829,12 @@ async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice){
       payment:newPayment
     }
   }
-  showReservationDetail(rvs.findIndex(x=>x.id===rvId),cacheKey)
+  // キャッシュ更新後の最新 rvs で再表示（古い rvs 参照ではなく）
+  const newRvs=window._rvDetailCache?.[cacheKey]
+  if(newRvs){
+    const newIdx=newRvs.findIndex(x=>x.id===rvId)
+    if(newIdx>=0) showReservationDetail(newIdx,cacheKey)
+  }
 }
 
 
