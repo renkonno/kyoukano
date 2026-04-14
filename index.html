@@ -451,7 +451,7 @@ tr:last-child td{border-bottom:none}
           <input type="hidden" id="ce-id">
           <div><div class="fi-lbl">名前</div><input class="fi" id="ce-name" placeholder="○○様"></div>
           <div><div class="fi-lbl">電話番号</div><input class="fi" id="ce-phone" type="tel" placeholder="090-0000-0000"></div>
-          <div><div class="fi-lbl">NGキャスト</div><input class="fi" id="ce-ng" placeholder="キャスト名（複数はカンマ区切り）"></div>
+          <div><div class="fi-lbl">NGキャスト（複数選択可）</div><div id="ce-ng-chips" style="display:flex;gap:.4rem;overflow-x:auto;padding:.4rem 0;-webkit-overflow-scrolling:touch;scrollbar-width:none"></div></div>
           <div><div class="fi-lbl">出禁</div>
             <select class="fi" id="ce-banned"><option value="false">通常</option><option value="true">出禁</option></select>
           </div>
@@ -1469,7 +1469,22 @@ function openAddCustomer(){
   document.getElementById('ce-name').value=''
   document.getElementById('ce-phone').value=''
   document.getElementById('ce-memo').value=''
+  // NGキャストチップを生成
+  const chipsWrap=document.getElementById('ce-ng-chips')
+  if(chipsWrap){
+    const activeCasts=allCustomers._casts||(window._allCastsForNg||[])
+    // キャスト一覧を使ってチップを生成（非同期取得）
+    sb.from('casts').select('id,name').eq('active',true).order('sort_order').then(({data})=>{
+      window._allCastsForNg=data||[]
+      chipsWrap.innerHTML=(data||[]).map(c=>'<button type="button" class="ce-ng-chip" data-name="'+c.name+'" onclick="toggleCeNgChip(this)" style="flex-shrink:0;padding:.35rem .9rem;border-radius:99px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:.82rem;cursor:pointer;font-family:inherit;white-space:nowrap">'+c.name+'</button>').join('')
+    })
+  }
   document.getElementById('customer-edit-overlay').classList.add('on')
+}
+function toggleCeNgChip(el){
+  const sel=el.dataset.selected==='true'
+  if(sel){el.dataset.selected='false';el.style.background='var(--surface2)';el.style.color='var(--text)';el.style.borderColor='var(--border)'}
+  else{el.dataset.selected='true';el.style.background='var(--rtx)';el.style.color='#fff';el.style.borderColor='var(--rtx)'}
 }
 
 async function saveNewCustomer(){
@@ -1478,13 +1493,15 @@ async function saveNewCustomer(){
   const noVal=document.getElementById('ce-id').value
   let no=noVal?parseInt(noVal):null
   if(!no){
-    // 自動採番
     const maxNo=allCustomers.reduce((m,c)=>Math.max(m,c.customer_no||0),0)
     no=maxNo+1
   }
   const phone=document.getElementById('ce-phone').value.trim()
   const memo=document.getElementById('ce-memo').value.trim()
-  const{error}=await sb.from('customers').insert({customer_no:no,name,phone,memo})
+  // NGキャストをチップから取得
+  const ngChips=document.querySelectorAll('.ce-ng-chip[data-selected="true"]')
+  const ng=Array.from(ngChips).map(x=>x.dataset.name).join(',')
+  const{error}=await sb.from('customers').insert({customer_no:no,name,phone,memo,ng_casts:ng})
   if(error){toast('エラー: '+error.message);return}
   toast('登録しました')
   closeSheet('customer-edit')
@@ -1775,14 +1792,14 @@ async function loadGantt(){
   for(let h=START_H;h<END_H;h++){
     // 1時間線（太・濃い）
     const pos=(h-START_H)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.22);z-index:1"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:2px;background:rgba(0,0,0,.55);z-index:1"></div>`)
     // 30分線（中）
     const pos30=(h-START_H+0.5)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.5);z-index:1"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1.5px;background:rgba(80,80,80,.7);z-index:1"></div>`)
     // 10分線（細・薄い）x4本（10,20,40,50分）
     ;[10,20,40,50].forEach(min=>{
       const posM=(h-START_H+min/60)/(END_H-START_H)*100
-      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.25);z-index:1"></div>`)
+      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(80,80,80,.45);z-index:1"></div>`)
     })
   }
   // 現在時刻ライン（setIntervalで更新）
@@ -1898,12 +1915,12 @@ async function renderGanttInto(area, date, filterShifts=null){
   const hourLines=[]
   for(let h=START_H;h<END_H;h++){
     const pos=(h-START_H)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.22);z-index:1"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:2px;background:rgba(0,0,0,.55);z-index:1"></div>`)
     const pos30=(h-START_H+0.5)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.5);z-index:1"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1.5px;background:rgba(80,80,80,.7);z-index:1"></div>`)
     ;[10,20,40,50].forEach(min=>{
       const posM=(h-START_H+min/60)/(END_H-START_H)*100
-      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.25);z-index:1"></div>`)
+      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(80,80,80,.45);z-index:1"></div>`)
     })
   }
   const nowDt=new Date()
@@ -2427,7 +2444,7 @@ async function loadGanttModal(){
   for(let min=0;min<=TOTAL_MIN;min+=10){
     const px=min*PX_PER_MIN
     const isH=min%60===0,is30=min%30===0&&!isH
-    gridHtml+=`<div style="position:absolute;left:${px}px;top:0;bottom:0;width:${isH?1.5:is30?.8:.4}px;background:rgba(0,0,0,${isH?.22:is30?.11:.04})"></div>`
+    gridHtml+=`<div style="position:absolute;left:${px}px;top:0;bottom:0;width:${isH?2:is30?1.5:1}px;background:rgba(0,0,0,${isH?.55:is30?.25:.12})"></div>`
   }
 
   // 現在時刻ライン
@@ -3727,12 +3744,21 @@ function extendReservation(rvId, cacheKey){
   const rvs=window._rvDetailCache?.[cacheKey]
   const r=rvs?.find(x=>x.id===rvId)
   if(!r){toast('予約が見つかりません');return}
-  if(!r.checkout_time){toast('退室時間が設定されていません');return}
+  // checkout_timeがない場合はcheckin_time+コース時間から推定
+  let _curCheckout=r.checkout_time?.slice(0,5)||''
+  if(!_curCheckout&&r.checkin_time){
+    const CMIN_EXT={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+    const[_ch,_cm]=r.checkin_time.slice(0,5).split(':').map(Number)
+    const _addMin=CMIN_EXT[r.course]||80
+    const _tot=_ch*60+_cm+_addMin
+    _curCheckout=String(Math.floor(_tot/60)%24).padStart(2,'0')+':'+String(_tot%60).padStart(2,'0')
+  }
+  if(!_curCheckout){toast('退室時間が設定されていません。先に退室時間を入力してください。');return}
   // 既存シートを削除
   const old=document.getElementById('extend-sheet')
   if(old)old.remove()
   // 現在の退室時間を表示
-  const curCheckout=r.checkout_time.slice(0,5)
+  const curCheckout=_curCheckout
   const [h,m]=curCheckout.split(':').map(Number)
   const totalMin=h*60+m+30
   const newH=Math.floor(totalMin/60)
