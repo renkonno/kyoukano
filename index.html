@@ -483,7 +483,7 @@ tr:last-child td{border-bottom:none}
           </div>
           <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様" oninput="autoKatakana(this)" onblur="autoKatakanaBlur(this)"></div>
           <div><div class="fi-lbl">来店区分</div>
-            <select class="fi" id="rv-is-new"><option value="">-- 選択 --</option><option value="false">再来</option><option value="true">新規</option></select>
+            <select class="fi" id="rv-is-new"><option value="">-- 選択 --</option><option value="false">再訪</option><option value="true">新規</option></select>
           </div>
           <div>
             <div class="fi-lbl">指名区分</div>
@@ -1285,7 +1285,7 @@ async function openCustomerDetail(id){
         <select class="fi" id="edit-cust-ng" multiple size="4" style="height:auto;min-height:80px">
           ${ngOptions}
         </select>
-        <div style="font-size:.65rem;color:var(--text3);margin-top:.2rem">※ 複数選択はCtrl/Cmd押しながらタップ</div>
+
       </div>
       <div><div class="fi-lbl">出禁</div>
         <select class="fi" id="edit-cust-banned">
@@ -1681,21 +1681,43 @@ async function loadGantt(){
     const label=h>=24?h-24+'時':h+'時'
     hourLabels.push(`<div style="position:absolute;left:${pos}%;transform:translateX(-50%);font-size:.6rem;color:var(--text3);white-space:nowrap">${label}</div>`)
   }
+  // 1時間・30分・10分の線を生成
   const hourLines=[]
-  for(let h=START_H;h<=END_H;h++){
+  for(let h=START_H;h<END_H;h++){
+    // 1時間線（太・濃い）
     const pos=(h-START_H)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1px;background:${h%2===0?'rgba(0,0,0,.12)':'rgba(0,0,0,.05)'}"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.22);z-index:1"></div>`)
+    // 30分線（中）
+    const pos30=(h-START_H+0.5)/(END_H-START_H)*100
+    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.12);z-index:1"></div>`)
+    // 10分線（細・薄い）x4本（10,20,40,50分）
+    ;[10,20,40,50].forEach(min=>{
+      const posM=(h-START_H+min/60)/(END_H-START_H)*100
+      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.07);z-index:1"></div>`)
+    })
   }
-  // 現在時刻ライン
+  // 現在時刻ライン（setIntervalで更新）
+  const todayStr=today()
+  const getNowLine=()=>{
+    const now=new Date()
+    const nowH=now.getHours()+(now.getHours()<START_H?24:0)
+    const nowPos=((nowH-START_H)*60+now.getMinutes())/TOTAL_MIN*100
+    if(ganttDate!==todayStr||nowPos<0||nowPos>100) return
+    const el=document.getElementById('gantt-now-line')
+    const el2=document.getElementById('gantt-now-label')
+    const t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
+    if(el){el.style.left=nowPos+'%'}
+    if(el2){el2.style.left=nowPos+'%';el2.textContent=t}
+  }
+  if(window._ganttNowTimer) clearInterval(window._ganttNowTimer)
   const now=new Date()
   const nowH=now.getHours()+(now.getHours()<START_H?24:0)
-  const nowM=now.getMinutes()
-  const nowPos=((nowH-START_H)*60+nowM)/TOTAL_MIN*100
-  const todayStr=today()
+  const nowPos=((nowH-START_H)*60+now.getMinutes())/TOTAL_MIN*100
   const nowLine=ganttDate===todayStr&&nowPos>=0&&nowPos<=100
-    ? `<div style="position:absolute;left:${nowPos}%;top:0;bottom:0;width:2px;background:rgba(255,59,48,.7);z-index:10"></div>
-       <div style="position:absolute;left:${nowPos}%;top:-14px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
+    ? `<div id="gantt-now-line" style="position:absolute;left:${nowPos}%;top:0;bottom:0;width:2px;background:rgba(255,59,48,.85);z-index:10"></div>
+       <div id="gantt-now-label" style="position:absolute;left:${nowPos}%;top:-14px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
     : ''
+  if(ganttDate===todayStr) window._ganttNowTimer=setInterval(getNowLine,30000)
   const CAST_COLORS=['#FF6B9D','#9B72CF','#4ECDC4','#FF9A56','#45B7D1','#96CEB4','#F7DC6F','#BB8FCE']
   let rows=''
   shifts.forEach((s,si)=>{
@@ -1785,17 +1807,22 @@ async function renderGanttInto(area, date, filterShifts=null){
     hourLabels.push(`<div style="position:absolute;left:${pos}%;transform:translateX(-50%);font-size:.6rem;color:var(--text3);white-space:nowrap">${label}</div>`)
   }
   const hourLines=[]
-  for(let h=START_H;h<=END_H;h++){
+  for(let h=START_H;h<END_H;h++){
     const pos=(h-START_H)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1px;background:${h%2===0?'rgba(0,0,0,.12)':'rgba(0,0,0,.05)'}"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.22);z-index:1"></div>`)
+    const pos30=(h-START_H+0.5)/(END_H-START_H)*100
+    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.12);z-index:1"></div>`)
+    ;[10,20,40,50].forEach(min=>{
+      const posM=(h-START_H+min/60)/(END_H-START_H)*100
+      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.07);z-index:1"></div>`)
+    })
   }
-  // 現在時刻ライン
   const nowDt=new Date()
+  const todayStr=today()
   const nowH=nowDt.getHours()+(nowDt.getHours()<START_H?24:0)
   const nowPos=((nowH-START_H)*60+nowDt.getMinutes())/TOTAL_MIN*100
-  const todayStr=today()
   const nowLine=date===todayStr&&nowPos>=0&&nowPos<=100
-    ? `<div style="position:absolute;left:${nowPos}%;top:0;bottom:0;width:2px;background:rgba(255,59,48,.7);z-index:10"></div><div style="position:absolute;left:${nowPos}%;top:-14px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap">${String(nowDt.getHours()).padStart(2,'0')}:${String(nowDt.getMinutes()).padStart(2,'0')}</div>`
+    ? `<div style="position:absolute;left:${nowPos}%;top:0;bottom:0;width:2px;background:rgba(255,59,48,.85);z-index:10"></div><div style="position:absolute;left:${nowPos}%;top:-14px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap">${String(nowDt.getHours()).padStart(2,'0')}:${String(nowDt.getMinutes()).padStart(2,'0')}</div>`
     : ''
   const CAST_COLORS=['#FF6B9D','#9B72CF','#4ECDC4','#FF9A56','#45B7D1','#96CEB4','#F7DC6F','#BB8FCE']
   let rows=''
@@ -3334,7 +3361,9 @@ function showReservationDetail(idx,cacheKey){
   // payment がJSON形式かどうか判定
   let payDisplay='-'
   const optNamesForPay=(r.options||'').split(',').filter(Boolean)
-  try{
+  // paymentが空またはnullの場合は「未設定」表示
+  if(!r.payment||r.payment==='null'||r.payment==='{}'){payDisplay='未設定'}
+  else { try{
     const pj=JSON.parse(r.payment||'{}')
     if(pj.course||pj.shimei||pj.option){
       // オプション個別の支払い方法を表示（pj["op_極液"] 等があれば個別表示、なければ pj.option で一括）
@@ -3348,7 +3377,7 @@ function showReservationDetail(idx,cacheKey){
     } else {
       payDisplay=payMap[r.payment]||r.payment||'-'
     }
-  }catch(e){payDisplay=payMap[r.payment]||r.payment||'-'}
+  }catch(e){payDisplay=payMap[r.payment]||r.payment||'-'} }
   // 受取金額計算（現金分のみ）
   let cashAmount=0,cardAmount=0,cashDetail=[],cardDetail=[]
   const optNames=(r.options||'').split(',').filter(Boolean)
@@ -3408,7 +3437,7 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div>
         <select id="edit-rv-isnew" class="fi2" style="margin-top:.3rem">
           <option value="">-- 選択 --</option>
-          <option value="false" ${!r.is_new?'selected':''}>再来</option>
+          <option value="false" ${!r.is_new?'selected':''}>再訪</option>
           <option value="true" ${r.is_new?'selected':''}>新規</option>
         </select>
       </div>
@@ -3429,14 +3458,26 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div>
         <input id="edit-rv-note" class="fi2" value="${r.note||''}" placeholder="任意" style="margin-top:.3rem">
       </div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション（登録済）</div>
-        <div style="font-size:.85rem;margin-top:.3rem;color:var(--text3)">${rvDisplayOpts||'なし'}</div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:.75rem;color:var(--text3)">オプション（登録済）</div>
+          <button class="btn btn-blue btn-xs" onclick="openAddOptionToRv(${r.id},'${cacheKey}')">＋追加</button>
+        </div>
+        <div id="rv-opts-display" style="font-size:.85rem;margin-top:.3rem;color:var(--text3)">${rvDisplayOpts||'なし'}</div>
       </div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">割引（登録済）</div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:.75rem;color:var(--text3)">割引（登録済）</div>
+        </div>
         <div style="font-size:.85rem;margin-top:.3rem;color:var(--rtx)">${discs||'なし'}</div>
       </div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法（登録済）</div>
-        <div style="font-size:.83rem;margin-top:.3rem;color:var(--text3)">${payDisplay}</div>
+      <div class="card">
+        <div style="font-size:.75rem;color:var(--text3)">支払い方法（登録済）</div>
+        <div style="font-size:.83rem;margin-top:.3rem;color:var(--text3)">${payDisplay||'未設定'}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <button class="btn btn-gold" onclick="saveReservationEdit(${r.id},'${cacheKey}')">訂正を保存</button>
+        <button class="btn btn-blue" onclick="extendReservation(${r.id},'${cacheKey}')">延長+30分</button>
       </div>
     </div>`:`<div style="display:flex;flex-direction:column;gap:.5rem">
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div><div style="font-size:.95rem;font-weight:700">${r.customer_name||'-'}</div></div>
@@ -3445,7 +3486,7 @@ function showReservationDetail(idx,cacheKey){
         <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div><div style="font-size:.9rem;font-weight:600">${r.checkin_time?.slice(0,5)||'-'}</div></div>
         <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div><div style="font-size:.9rem;font-weight:600">${r.checkout_time?.slice(0,5)||'-'}</div></div>
       </div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再来'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再訪'}</div></div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div><div>${r.shimei_type||'フリー'}</div></div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
       ${rvDisplayOpts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${rvDisplayOpts}</div></div>`:''}
@@ -3455,7 +3496,7 @@ function showReservationDetail(idx,cacheKey){
       ${cashBlock}
     </div>`}
     ${me?.is_owner?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem">
-      <button class="btn btn-gold" onclick="saveReservationEdit(${r.id},'${cacheKey}')">訂正を保存</button>
+      <div></div>
       <button class="btn btn-red" onclick="deleteReservation(${r.id},'${cacheKey}')">この予約を削除</button>
     </div>`:''}
     <button class="btn btn-gray btn-full" style="margin-top:.5rem" onclick="backToRvList()">← 一覧に戻る</button>
@@ -3521,6 +3562,61 @@ async function saveReservationEdit(rvId,cacheKey){
   backToRvList()
   // 本日ページも再読み込み
   if(document.getElementById('p-today')?.classList.contains('on'))loadToday()
+}
+
+async function openAddOptionToRv(rvId, cacheKey){
+  const rvs=window._rvDetailCache?.[cacheKey]
+  const r=rvs?.find(x=>x.id===rvId)
+  if(!r){toast('予約が見つかりません');return}
+  const availOpts=(opts||[]).filter(o=>o.name&&o.price>0)
+  if(!availOpts.length){toast('オプションが設定されていません');return}
+  const currentOpts=(r.options||'').split(',').filter(Boolean)
+  const lines=availOpts.map(function(o,i){return (i+1)+':'+o.name+'(¥'+o.price.toLocaleString()+')'})
+  const msg='追加するオプション番号をカンマ区切りで入力\n現在: '+(currentOpts.join(',')||'なし')+'\n\n'+lines.join('\n')
+  const input=prompt(msg)
+  if(input===null)return
+  const idxList=input.split(',').map(function(x){return parseInt(x.trim())-1}).filter(function(i){return i>=0&&i<availOpts.length})
+  const newOpts=currentOpts.slice()
+  idxList.forEach(function(i){if(!newOpts.includes(availOpts[i].name))newOpts.push(availOpts[i].name)})
+  const err=(await sb.from('reservations').update({options:newOpts.join(',')}).eq('id',rvId)).error
+  if(err){toast('エラー: '+err.message);return}
+  toast('オプションを追加しました')
+  if(window._rvDetailCache?.[cacheKey]){
+    const idx=window._rvDetailCache[cacheKey].findIndex(function(x){return x.id===rvId})
+    if(idx>=0) window._rvDetailCache[cacheKey][idx]=Object.assign({},window._rvDetailCache[cacheKey][idx],{options:newOpts.join(',')})
+  }
+  showReservationDetail(rvs.findIndex(function(x){return x.id===rvId}),cacheKey)
+}
+
+async function extendReservation(rvId, cacheKey){
+  const rvs=window._rvDetailCache?.[cacheKey]
+  const r=rvs?.find(x=>x.id===rvId)
+  if(!r){toast('予約が見つかりません');return}
+  if(!r.checkout_time){toast('退室時間が設定されていません');return}
+  // 退室+30分
+  const [h,m]=r.checkout_time.slice(0,5).split(':').map(Number)
+  const totalMin=h*60+m+30
+  const newH=Math.floor(totalMin/60)
+  const newM=totalMin%60
+  const newCheckout=String(newH).padStart(2,'0')+':'+String(newM).padStart(2,'0')
+  // 同じシフト内の他の予約とブッキングチェック
+  const shiftRvs=(rvs||[]).filter(x=>x.id!==rvId&&x.shift_id===r.shift_id&&x.checkin_time)
+  const conflicts=shiftRvs.filter(x=>{
+    const xStart=x.checkin_time?.slice(0,5)
+    return xStart&&xStart<newCheckout&&(x.checkout_time?.slice(0,5)||'99:99')>r.checkout_time?.slice(0,5)
+  })
+  if(conflicts.length){
+    const names=conflicts.map(x=>x.customer_name||'不明').join('、')
+    if(!confirm(`⚠️ ブッキング警告\n${names}の予約と重複する可能性があります。\n延長しますか？`))return
+  }
+  const{error}=await sb.from('reservations').update({checkout_time:newCheckout+':00'}).eq('id',rvId)
+  if(error){toast('エラー: '+error.message);return}
+  toast(`退室時間を${newCheckout}に延長しました`)
+  if(window._rvDetailCache?.[cacheKey]){
+    const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
+    if(idx>=0) window._rvDetailCache[cacheKey][idx]={...window._rvDetailCache[cacheKey][idx],checkout_time:newCheckout+':00'}
+  }
+  showReservationDetail(rvs.findIndex(x=>x.id===rvId),cacheKey)
 }
 
 async function deleteReservation(rvId,cacheKey){
