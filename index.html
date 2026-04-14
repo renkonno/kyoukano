@@ -1342,13 +1342,10 @@ async function openCustomerDetail(id){
       <div><div class="fi-lbl">電話番号</div><input class="fi" id="edit-cust-phone" type="tel" value="${c.phone||''}" placeholder="090-0000-0000"></div>
       <div>
         <div class="fi-lbl">NGキャスト（複数選択可）</div>
-        <div id="edit-cust-ng-wrap" style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.4rem 0">
+        <div id="edit-cust-ng-wrap" style="display:flex;gap:.4rem;overflow-x:auto;padding:.4rem 0;-webkit-overflow-scrolling:touch;scrollbar-width:none">
           ${(allCastsData||[]).map(cast=>{
             const chk=ngSelected.includes(cast.name)
-            const bg=chk?'var(--rtx)':'var(--surface2)'
-            const col=chk?'#fff':'var(--text)'
-            const bd=chk?'var(--rtx)':'var(--border)'
-            return '<button type="button" class="ng-chip" data-name="'+cast.name+'" onclick="toggleNgChip(this)" style="padding:.3rem .8rem;border-radius:99px;border:1.5px solid '+bd+';background:'+bg+';color:'+col+';font-size:.82rem;cursor:pointer;font-family:inherit;transition:all .15s">'+cast.name+'</button>'
+            return '<button type="button" class="ng-chip" data-name="'+cast.name+'" onclick="toggleNgChip(this)" style="flex-shrink:0;padding:.35rem .9rem;border-radius:99px;border:1.5px solid '+(chk?'var(--rtx)':'var(--border)')+';background:'+(chk?'var(--rtx)':'var(--surface2)')+';color:'+(chk?'#fff':'var(--text)')+';font-size:.82rem;cursor:pointer;font-family:inherit;white-space:nowrap">'+cast.name+'</button>'
           }).join('')}
         </div>
       </div>
@@ -1781,11 +1778,11 @@ async function loadGantt(){
     hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.22);z-index:1"></div>`)
     // 30分線（中）
     const pos30=(h-START_H+0.5)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.12);z-index:1"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.5);z-index:1"></div>`)
     // 10分線（細・薄い）x4本（10,20,40,50分）
     ;[10,20,40,50].forEach(min=>{
       const posM=(h-START_H+min/60)/(END_H-START_H)*100
-      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.07);z-index:1"></div>`)
+      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.25);z-index:1"></div>`)
     })
   }
   // 現在時刻ライン（setIntervalで更新）
@@ -1903,10 +1900,10 @@ async function renderGanttInto(area, date, filterShifts=null){
     const pos=(h-START_H)/(END_H-START_H)*100
     hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1.5px;background:rgba(0,0,0,.22);z-index:1"></div>`)
     const pos30=(h-START_H+0.5)/(END_H-START_H)*100
-    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.12);z-index:1"></div>`)
+    hourLines.push(`<div style="position:absolute;left:${pos30}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.5);z-index:1"></div>`)
     ;[10,20,40,50].forEach(min=>{
       const posM=(h-START_H+min/60)/(END_H-START_H)*100
-      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.07);z-index:1"></div>`)
+      hourLines.push(`<div style="position:absolute;left:${posM}%;top:0;bottom:0;width:1px;background:rgba(100,100,100,.25);z-index:1"></div>`)
     })
   }
   const nowDt=new Date()
@@ -3741,7 +3738,10 @@ function extendReservation(rvId, cacheKey){
   const newH=Math.floor(totalMin/60)
   const newM=totalMin%60
   const newCheckout=String(newH).padStart(2,'0')+':'+String(newM).padStart(2,'0')
-  const extCount=(r.extension_count||0)+1
+  // paymentのext_countから延長回数を取得
+  let _pjExt={}
+  try{_pjExt=JSON.parse(r.payment||'{}')}catch(e){}
+  const extCount=(_pjExt.ext_count||0)+1
   // 店舗設定から延長料金取得
   const extPrice=storeSettings.ext30||storeSettings.price_ext30||6000
   const sheet=document.createElement('div')
