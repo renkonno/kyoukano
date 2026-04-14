@@ -274,7 +274,10 @@ tr:last-child td{border-bottom:none}
       <button class="btn-sm" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
-  <div class="app-body">
+  <div id="ptr-indicator" style="display:none;position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:200;background:var(--surface);border-radius:99px;padding:.3rem .8rem;box-shadow:var(--shl);font-size:.75rem;color:var(--accent);font-weight:600;align-items:center;gap:.4rem">
+    <span id="ptr-text">↓ 引っ張って更新</span>
+  </div>
+  <div class="app-body" id="app-body">
 
     <!-- キャスト：シフト申請 -->
     <!-- カレンダーパネル -->
@@ -971,6 +974,63 @@ function tab(name){
   if(name==='owner-cast')   loadCastMgmt()
 }
 
+// ── プルトゥリフレッシュ ──
+function refreshCurrentTab(){
+  const name=sessionStorage.getItem('kyoukano_tab')||''
+  if(name==='shift')         loadCal()
+  else if(name==='shift-list')    loadShiftList()
+  else if(name==='salary')        loadMySalary()
+  else if(name==='owner-shift')   loadOwnerCal()
+  else if(name==='today')         loadToday()
+  else if(name==='cast-memo'){    loadCastMemoPage();loadCastMemoList()}
+  else if(name==='owner-customer')loadCustomers()
+  else if(name==='owner-salary')  loadOwnerSalary()
+  else if(name==='owner-cast')    loadCastMgmt()
+  else tab(name)
+}
+;(function initPullToRefresh(){
+  let startY=0,pulling=false,triggered=false
+  const THRESHOLD=70
+  const ind=document.getElementById('ptr-indicator')
+  const txt=document.getElementById('ptr-text')
+  document.addEventListener('touchstart',e=>{
+    const body=document.getElementById('app-body')
+    if(!body||body.scrollTop>0)return
+    // シートが開いてたら無視
+    if(document.querySelector('.sheet-overlay.on,.overlay.on'))return
+    startY=e.touches[0].clientY
+    pulling=true;triggered=false
+  },{passive:true})
+  document.addEventListener('touchmove',e=>{
+    if(!pulling)return
+    const body=document.getElementById('app-body')
+    if(!body||body.scrollTop>0){pulling=false;return}
+    const dy=e.touches[0].clientY-startY
+    if(dy<10)return
+    if(ind){
+      ind.style.display='flex'
+      if(dy>=THRESHOLD&&!triggered){
+        txt.textContent='✓ 離して更新'
+        triggered=true
+      } else if(dy<THRESHOLD){
+        txt.textContent='↓ 引っ張って更新'
+        triggered=false
+      }
+    }
+  },{passive:true})
+  document.addEventListener('touchend',()=>{
+    if(!pulling)return
+    pulling=false
+    if(ind)ind.style.display='none'
+    if(triggered){
+      triggered=false
+      toast('更新中...')
+      refreshCurrentTab()
+    }
+  },{passive:true})
+})()
+
+
 // ── キャスト：シフト申請 ──
 function calMove(d){calMonth=addMonth(calMonth,d);loadCal()}
 async function loadCal(){
@@ -1282,10 +1342,12 @@ async function openCustomerDetail(id){
       <div><div class="fi-lbl">電話番号</div><input class="fi" id="edit-cust-phone" type="tel" value="${c.phone||''}" placeholder="090-0000-0000"></div>
       <div>
         <div class="fi-lbl">NGキャスト（複数選択可）</div>
-        <select class="fi" id="edit-cust-ng" multiple style="height:120px;padding:.3rem">
-          ${ngOptions}
-        </select>
-
+        <div id="edit-cust-ng-wrap" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);padding:.4rem .6rem;max-height:130px;overflow-y:auto">
+          ${(allCastsData||[]).map(cast=>{
+            const chk=ngSelected.includes(cast.name)
+            return '<label style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;cursor:pointer"><input type="checkbox" class="ng-cast-chk" value="'+cast.name+'" '+(chk?'checked':'')+' style="width:16px;height:16px;accent-color:var(--accent)"><span style="font-size:.85rem">'+cast.name+'</span></label>'
+          }).join('')}
+        </div>
       </div>
       <div><div class="fi-lbl">出禁</div>
         <select class="fi" id="edit-cust-banned">
@@ -1336,9 +1398,9 @@ async function openCustomerDetail(id){
 async function saveCustomerEdit(id){
   const name=document.getElementById('edit-cust-name').value.trim()
   const phone=document.getElementById('edit-cust-phone').value.trim()
-  // マルチセレクトからNG取得
-  const ngEl=document.getElementById('edit-cust-ng')
-  const ng=ngEl?Array.from(ngEl.selectedOptions).map(o=>o.value).join(','):''
+  // チェックボックスからNG取得
+  const ngChecks=document.querySelectorAll('.ng-cast-chk:checked')
+  const ng=Array.from(ngChecks).map(x=>x.value).join(',')
   const memo=document.getElementById('edit-cust-memo').value.trim()
   const bannedEl=document.getElementById('edit-cust-banned')
   const ban=bannedEl?bannedEl.value==='true':false
@@ -3399,13 +3461,22 @@ function showReservationDetail(idx,cacheKey){
     const opItem=opts.find(o=>o.name===opName)
     const opPrice=opItem?.price||0
     if(opPrice>0){
-      // オプション個別の支払い方法: pj["op_極液"] のようなキー、なければ pj.option にフォールバック
       const opKey='op_'+opName
       const opPayMethod=pj[opKey]||pj.option||'現金'
       if(opPayMethod==='カード'){cardAmount+=opPrice;cardDetail.push(`${opName} ¥${opPrice.toLocaleString()}(カード)`)}
       else{cashAmount+=opPrice;cashDetail.push(`${opName} ¥${opPrice.toLocaleString()}(現金)`)}
     }
   })
+  // 延長料金（extension_countまたはpj.ext_countから取得）
+  const extCnt=r.extension_count||pj.ext_count||0
+  if(extCnt>0){
+    const extUnitPrice=storeSettings.ext30||storeSettings.price_ext30||6000
+    for(let i=1;i<=extCnt;i++){
+      const extPayMethod=pj['ext_'+i]||'現金'
+      if(extPayMethod==='カード'){cardAmount+=extUnitPrice;cardDetail.push(`延長${i}回目 ¥${extUnitPrice.toLocaleString()}(カード)`)}
+      else{cashAmount+=extUnitPrice;cashDetail.push(`延長${i}回目 ¥${extUnitPrice.toLocaleString()}(現金)`)}
+    }
+  }
   const cashBlock=!me?.is_owner?`<div class="card" style="background:linear-gradient(135deg,rgba(255,149,0,.1),rgba(255,149,0,.05));border-color:rgba(255,149,0,.3)">
     <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-bottom:.35rem">💴 受取金額（現金）</div>
     <div style="font-size:1.1rem;font-weight:800;color:var(--accent)">¥${cashAmount.toLocaleString()}</div>
@@ -3586,7 +3657,9 @@ function openAddOptionToRv(rvId, cacheKey){
   sheet.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:1.2rem;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)'
   sheet.innerHTML='<div style="font-size:.9rem;font-weight:700;margin-bottom:.75rem">オプションを追加</div>'
     +'<div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">現在: '+(currentOpts.join('・')||'なし')+'</div>'
-    +'<select id="add-opt-sel" class="fi" style="margin-bottom:.75rem"><option value="">-- 選択してください --</option>'+optSelOpts+'</select>'
+    +'<select id="add-opt-sel" class="fi" style="margin-bottom:.5rem"><option value="">-- 選択してください --</option>'+optSelOpts+'</select>'
+    +'<div style="margin-bottom:.75rem"><div class="fi-lbl">支払い方法</div>'
+    +'<select id="add-opt-pay-sel" class="fi"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">'
     +'<button class="btn btn-gray" onclick="closeAddOptSheet()">キャンセル</button>'
     +'<button class="btn btn-gold" onclick="confirmAddOpt('+rvId+',\''+cacheKey+'\')">追加する</button>'
@@ -3599,6 +3672,7 @@ function closeAddOptSheet(){const s=document.getElementById('add-opt-sheet');if(
 async function confirmAddOpt(rvId, cacheKey){
   const sel=document.getElementById('add-opt-sel')
   const optName=sel?.value
+  const payMethod=document.getElementById('add-opt-pay-sel')?.value||'現金'
   if(!optName){toast('オプションを選択してください');return}
   document.getElementById('add-opt-sheet')?.remove()
   const rvs=window._rvDetailCache?.[cacheKey]
@@ -3607,46 +3681,105 @@ async function confirmAddOpt(rvId, cacheKey){
   const currentOpts=(r.options||'').split(',').filter(Boolean)
   if(currentOpts.includes(optName)){toast('すでに追加されています');return}
   const newOpts=[...currentOpts,optName]
-  const{error}=await sb.from('reservations').update({options:newOpts.join(',')}).eq('id',rvId)
+  // paymentにオプション支払い方法を追加
+  let pj={}
+  try{pj=JSON.parse(r.payment||'{}')}catch(e){}
+  pj['op_'+optName]=payMethod
+  const newPayment=JSON.stringify(pj)
+  const{error}=await sb.from('reservations').update({options:newOpts.join(','),payment:newPayment}).eq('id',rvId)
   if(error){toast('エラー: '+error.message);return}
   toast(optName+'を追加しました')
   if(window._rvDetailCache?.[cacheKey]){
     const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
-    if(idx>=0) window._rvDetailCache[cacheKey][idx]={...window._rvDetailCache[cacheKey][idx],options:newOpts.join(',')}
+    if(idx>=0) window._rvDetailCache[cacheKey][idx]={...window._rvDetailCache[cacheKey][idx],options:newOpts.join(','),payment:newPayment}
   }
   showReservationDetail(rvs.findIndex(x=>x.id===rvId),cacheKey)
 }
 
-async function extendReservation(rvId, cacheKey){
+function extendReservation(rvId, cacheKey){
   const rvs=window._rvDetailCache?.[cacheKey]
   const r=rvs?.find(x=>x.id===rvId)
   if(!r){toast('予約が見つかりません');return}
   if(!r.checkout_time){toast('退室時間が設定されていません');return}
-  // 退室+30分
-  const [h,m]=r.checkout_time.slice(0,5).split(':').map(Number)
+  // 既存シートを削除
+  const old=document.getElementById('extend-sheet')
+  if(old)old.remove()
+  // 現在の退室時間を表示
+  const curCheckout=r.checkout_time.slice(0,5)
+  const [h,m]=curCheckout.split(':').map(Number)
   const totalMin=h*60+m+30
   const newH=Math.floor(totalMin/60)
   const newM=totalMin%60
   const newCheckout=String(newH).padStart(2,'0')+':'+String(newM).padStart(2,'0')
-  // 同じシフト内の他の予約とブッキングチェック
+  const extCount=(r.extension_count||0)+1
+  // 店舗設定から延長料金取得
+  const extPrice=storeSettings.ext30||storeSettings.price_ext30||6000
+  const sheet=document.createElement('div')
+  sheet.id='extend-sheet'
+  sheet.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:1.2rem;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)'
+  sheet.innerHTML='<div style="font-size:.9rem;font-weight:700;margin-bottom:.75rem">延長（+30分）</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:.6rem .75rem;margin-bottom:.75rem;font-size:.85rem">'
+    +'退室: '+curCheckout+' → <strong>'+newCheckout+'</strong>　延長'+extCount+'回目'
+    +'<div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">延長料金: ¥'+extPrice.toLocaleString()+'</div>'
+    +'</div>'
+    +'<div style="margin-bottom:.75rem">'
+    +'<div class="fi-lbl">支払い方法</div>'
+    +'<select id="extend-pay-sel" class="fi"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">'
+    +'<button class="btn btn-gray" onclick="document.getElementById(\'extend-sheet\').remove()">キャンセル</button>'
+    +'<button class="btn btn-gold" onclick="confirmExtend('+rvId+',\''+cacheKey+'\',\''+newCheckout+'\','+extCount+','+extPrice+')">延長する</button>'
+    +'</div>'
+  document.body.appendChild(sheet)
+}
+
+async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice){
+  const payMethod=document.getElementById('extend-pay-sel')?.value||'現金'
+  document.getElementById('extend-sheet')?.remove()
+  const rvs=window._rvDetailCache?.[cacheKey]
+  const r=rvs?.find(x=>x.id===rvId)
+  if(!r)return
+  // ブッキングチェック
   const shiftRvs=(rvs||[]).filter(x=>x.id!==rvId&&x.shift_id===r.shift_id&&x.checkin_time)
+  const curCheckout=r.checkout_time.slice(0,5)
   const conflicts=shiftRvs.filter(x=>{
     const xStart=x.checkin_time?.slice(0,5)
-    return xStart&&xStart<newCheckout&&(x.checkout_time?.slice(0,5)||'99:99')>r.checkout_time?.slice(0,5)
+    return xStart&&xStart<newCheckout&&(x.checkout_time?.slice(0,5)||'99:99')>curCheckout
   })
   if(conflicts.length){
     const names=conflicts.map(x=>x.customer_name||'不明').join('、')
-    if(!confirm(`⚠️ ブッキング警告\n${names}の予約と重複する可能性があります。\n延長しますか？`))return
+    if(!confirm('⚠️ ブッキング警告\n'+names+'の予約と重複する可能性があります。\n延長しますか？'))return
   }
-  const{error}=await sb.from('reservations').update({checkout_time:newCheckout+':00'}).eq('id',rvId)
-  if(error){toast('エラー: '+error.message);return}
-  toast(`退室時間を${newCheckout}に延長しました`)
+  // paymentに延長料金を追加
+  let pj={}
+  try{pj=JSON.parse(r.payment||'{}')}catch(e){}
+  pj['ext_'+extCount]=payMethod
+  pj['ext_count']=extCount
+  const newPayment=JSON.stringify(pj)
+  const newCheckoutFull=newCheckout+':00'
+  const{error}=await sb.from('reservations').update({
+    checkout_time:newCheckoutFull,
+    extension_count:extCount,
+    payment:newPayment
+  }).eq('id',rvId)
+  if(error){
+    // extension_countカラムがない場合はそれ以外を更新
+    const{error:e2}=await sb.from('reservations').update({checkout_time:newCheckoutFull,payment:newPayment}).eq('id',rvId)
+    if(e2){toast('エラー: '+e2.message);return}
+  }
+  toast('退室時間を'+newCheckout+'に延長しました（'+extCount+'回目）')
   if(window._rvDetailCache?.[cacheKey]){
     const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
-    if(idx>=0) window._rvDetailCache[cacheKey][idx]={...window._rvDetailCache[cacheKey][idx],checkout_time:newCheckout+':00'}
+    if(idx>=0) window._rvDetailCache[cacheKey][idx]={
+      ...window._rvDetailCache[cacheKey][idx],
+      checkout_time:newCheckoutFull,
+      extension_count:extCount,
+      payment:newPayment
+    }
   }
   showReservationDetail(rvs.findIndex(x=>x.id===rvId),cacheKey)
 }
+
 
 async function deleteReservation(rvId,cacheKey){
   if(!confirm('この予約を削除しますか？'))return
