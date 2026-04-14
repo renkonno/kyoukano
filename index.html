@@ -3514,7 +3514,8 @@ function showReservationDetail(idx,cacheKey){
   // 延長料金（extension_countまたはpj.ext_countから取得）
   const extCnt=r.extension_count||pj.ext_count||0
   if(extCnt>0){
-    const extUnitPrice=storeSettings.ext30||storeSettings.price_ext30||6000
+    const extCourseD=courses.find(c=>c.name&&c.name.includes('延長'))
+    const extUnitPrice=extCourseD?.price||storeSettings.ext30||6000
     for(let i=1;i<=extCnt;i++){
       const extPayMethod=pj['ext_'+i]||'現金'
       if(extPayMethod==='カード'){cardAmount+=extUnitPrice;cardDetail.push(`延長${i}回目 ¥${extUnitPrice.toLocaleString()}(カード)`)}
@@ -3741,100 +3742,122 @@ async function confirmAddOpt(rvId, cacheKey){
 }
 
 function extendReservation(rvId, cacheKey){
+  // キャッシュから予約を取得
   const rvs=window._rvDetailCache?.[cacheKey]
   const r=rvs?.find(x=>x.id===rvId)
-  if(!r){toast('予約が見つかりません');return}
-  // checkout_timeがない場合はcheckin_time+コース時間から推定
-  let _curCheckout=r.checkout_time?.slice(0,5)||''
-  if(!_curCheckout&&r.checkin_time){
-    const CMIN_EXT={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
-    const[_ch,_cm]=r.checkin_time.slice(0,5).split(':').map(Number)
-    const _addMin=CMIN_EXT[r.course]||80
-    const _tot=_ch*60+_cm+_addMin
-    _curCheckout=String(Math.floor(_tot/60)%24).padStart(2,'0')+':'+String(_tot%60).padStart(2,'0')
+  if(!r){toast('予約データが見つかりません');return}
+
+  // 現在の退室時間を取得（nullなら checkin+コース時間 で推定）
+  const CMIN={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+  let curCO=(r.checkout_time||'').slice(0,5)
+  if(!curCO && r.checkin_time){
+    const [ci_h,ci_m]=r.checkin_time.slice(0,5).split(':').map(Number)
+    const addM=CMIN[r.course]||80
+    const tot=ci_h*60+ci_m+addM
+    curCO=String(Math.floor(tot/60)%24).padStart(2,'0')+':'+String(tot%60).padStart(2,'0')
   }
-  if(!_curCheckout){toast('退室時間が設定されていません。先に退室時間を入力してください。');return}
-  // 既存シートを削除
+  if(!curCO){toast('退室時間が未設定です。先に退室時間を入力してください。');return}
+
+  // 延長後の退室時間を計算
+  const [co_h,co_m]=curCO.split(':').map(Number)
+  const newTot=co_h*60+co_m+30
+  const newCO=String(Math.floor(newTot/60)%24).padStart(2,'0')+':'+String(newTot%60).padStart(2,'0')
+
+  // 延長回数・料金
+  let pjNow={}
+  try{pjNow=JSON.parse(r.payment||'{}')}catch(e){}
+  const extCount=(pjNow.ext_count||0)+1
+  const extCourse=courses.find(c=>c.name&&c.name.includes('延長'))
+  const extPrice=extCourse?.price||storeSettings.ext30||6000
+
+  // ブッキングチェック（同じシフトの他の予約と重複するか）
+  const others=(rvs||[]).filter(x=>x.id!==rvId && x.checkin_time)
+  const conflicts=others.filter(x=>{
+    const xCI=x.checkin_time.slice(0,5)
+    const xCO=(x.checkout_time||'99:99').slice(0,5)
+    // 延長後の時間帯 curCO〜newCO が他予約の入室〜退室と重なるか
+    return xCI < newCO && xCO > curCO
+  })
+
+  // 既存シートを削除して新規生成
   const old=document.getElementById('extend-sheet')
   if(old)old.remove()
-  // 現在の退室時間を表示
-  const curCheckout=_curCheckout
-  const [h,m]=curCheckout.split(':').map(Number)
-  const totalMin=h*60+m+30
-  const newH=Math.floor(totalMin/60)
-  const newM=totalMin%60
-  const newCheckout=String(newH).padStart(2,'0')+':'+String(newM).padStart(2,'0')
-  // paymentのext_countから延長回数を取得
-  let _pjExt={}
-  try{_pjExt=JSON.parse(r.payment||'{}')}catch(e){}
-  const extCount=(_pjExt.ext_count||0)+1
-  // 店舗設定から延長料金取得
-  const extPrice=storeSettings.ext30||storeSettings.price_ext30||6000
+
+  const warnHtml=conflicts.length
+    ? '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:.5rem .75rem;margin-bottom:.75rem;font-size:.8rem;color:#dc2626;font-weight:600">⚠️ ブッキング警告：'
+      +conflicts.map(x=>x.customer_name||'不明').join('・')
+      +'の予約と重複します</div>'
+    : ''
+
   const sheet=document.createElement('div')
   sheet.id='extend-sheet'
   sheet.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:1.2rem;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)'
-  sheet.innerHTML='<div style="font-size:.9rem;font-weight:700;margin-bottom:.75rem">延長（+30分）</div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:.6rem .75rem;margin-bottom:.75rem;font-size:.85rem">'
-    +'退室: '+curCheckout+' → <strong>'+newCheckout+'</strong>　延長'+extCount+'回目'
-    +'<div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">延長料金: ¥'+extPrice.toLocaleString()+'</div>'
+  sheet.innerHTML=''
+    +'<div style="font-size:.95rem;font-weight:700;margin-bottom:.75rem">延長（+30分）</div>'
+    +warnHtml
+    +'<div style="background:var(--surface2);border-radius:8px;padding:.65rem .85rem;margin-bottom:.75rem;font-size:.85rem">'
+      +'退室: <b>'+curCO+'</b> → <b style="color:var(--accent)">'+newCO+'</b>　延長 '+extCount+' 回目'
+      +'<div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">延長料金: ¥'+extPrice.toLocaleString()+'</div>'
     +'</div>'
     +'<div style="margin-bottom:.75rem">'
-    +'<div class="fi-lbl">支払い方法</div>'
-    +'<select id="extend-pay-sel" class="fi"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select>'
+      +'<div class="fi-lbl">支払い方法</div>'
+      +'<select id="extend-pay-sel" class="fi"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">'
-    +'<button class="btn btn-gray" onclick="document.getElementById(\'extend-sheet\').remove()">キャンセル</button>'
-    +'<button class="btn btn-gold" onclick="confirmExtend('+rvId+',\''+cacheKey+'\',\''+newCheckout+'\','+extCount+','+extPrice+',\''+curCheckout+'\')" >延長する</button>'
+      +'<button class="btn btn-gray" onclick="document.getElementById(\'extend-sheet\').remove()">キャンセル</button>'
+      +'<button class="btn btn-gold" id="btn-do-extend">延長する</button>'
     +'</div>'
   document.body.appendChild(sheet)
+
+  // ボタンにイベントを直接バインド（onclick文字列でなく）
+  document.getElementById('btn-do-extend').addEventListener('click', ()=>doExtend(rvId, cacheKey, curCO, newCO, extCount, extPrice, conflicts))
 }
 
-async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice, prevCheckout){
+async function doExtend(rvId, cacheKey, curCO, newCO, extCount, extPrice, conflicts){
   const payMethod=document.getElementById('extend-pay-sel')?.value||'現金'
   document.getElementById('extend-sheet')?.remove()
+
+  // ブッキング警告が出ていた場合は確認
+  if(conflicts && conflicts.length){
+    const names=conflicts.map(x=>x.customer_name||'不明').join('、')
+    if(!confirm('⚠️ ブッキング警告\n'+names+'の予約と重複します。\nそれでも延長しますか？'))return
+  }
+
+  // キャッシュから最新データを取得
   const rvs=window._rvDetailCache?.[cacheKey]
   const r=rvs?.find(x=>x.id===rvId)
-  if(!r)return
-  // ブッキングチェック
-  const shiftRvs=(rvs||[]).filter(x=>x.id!==rvId&&x.shift_id===r.shift_id&&x.checkin_time)
-  // checkout_timeがnullの場合は空文字にしてクラッシュを防ぐ
-  const curCheckout=prevCheckout||(r.checkout_time||'').slice(0,5)
-  const conflicts=shiftRvs.filter(x=>{
-    const xStart=x.checkin_time?.slice(0,5)
-    return xStart&&xStart<newCheckout&&(x.checkout_time?.slice(0,5)||'99:99')>curCheckout
-  })
-  if(conflicts.length){
-    const names=conflicts.map(x=>x.customer_name||'不明').join('、')
-    if(!confirm('⚠️ ブッキング警告\n'+names+'の予約と重複する可能性があります。\n延長しますか？'))return
-  }
-  // paymentに延長料金を追加
+  if(!r){toast('予約データが見つかりません');return}
+
+  // payment を更新（延長料金を追加）
   let pj={}
   try{pj=JSON.parse(r.payment||'{}')}catch(e){}
   pj['ext_'+extCount]=payMethod
   pj['ext_count']=extCount
   const newPayment=JSON.stringify(pj)
-  const newCheckoutFull=newCheckout+':00'
-  // extension_countカラムなしでも動くようpaymentのみで管理
+  const newCOFull=newCO+':00'
+
   const{error}=await sb.from('reservations').update({
-    checkout_time:newCheckoutFull,
+    checkout_time:newCOFull,
     payment:newPayment
   }).eq('id',rvId)
-  if(error){toast('エラー: '+error.message);return}
-  toast('退室時間を'+newCheckout+'に延長しました（'+extCount+'回目）')
-  if(window._rvDetailCache?.[cacheKey]){
-    const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
-    if(idx>=0) window._rvDetailCache[cacheKey][idx]={
+  if(error){toast('保存エラー: '+error.message);console.error(error);return}
+
+  toast('退室時間を '+newCO+' に延長しました（'+extCount+' 回目）')
+
+  // キャッシュを更新
+  const idx=rvs.findIndex(x=>x.id===rvId)
+  if(idx>=0){
+    window._rvDetailCache[cacheKey][idx]={
       ...window._rvDetailCache[cacheKey][idx],
-      checkout_time:newCheckoutFull,
+      checkout_time:newCOFull,
       payment:newPayment
     }
   }
-  // キャッシュ更新後の最新 rvs で再表示（古い rvs 参照ではなく）
-  const newRvs=window._rvDetailCache?.[cacheKey]
-  if(newRvs){
-    const newIdx=newRvs.findIndex(x=>x.id===rvId)
-    if(newIdx>=0) showReservationDetail(newIdx,cacheKey)
-  }
+
+  // 詳細画面を再表示（更新済みキャッシュを使用）
+  const updatedRvs=window._rvDetailCache[cacheKey]
+  const newIdx=updatedRvs.findIndex(x=>x.id===rvId)
+  if(newIdx>=0) showReservationDetail(newIdx, cacheKey)
 }
 
 
