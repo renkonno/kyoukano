@@ -3109,20 +3109,31 @@ async function saveFee(){
     joined_at:document.getElementById('f-joined-at')?.value||null
   }
   const castIdNum=Number(feeCastId2)
-  console.log('saveFee castId:', castIdNum, 'payload:', payloadUpdate)
+  // 保存前の値を確認用toastで表示
+  toast('保存中... castId='+castIdNum+' op_isho='+payloadUpdate.op_isho)
+  await new Promise(r=>setTimeout(r,1500))
   // update を実行して影響行数を確認
   const{data:upData,error:upErr}=await sb.from('cast_fees').update(payloadUpdate).eq('cast_id',castIdNum).select()
-  console.log('saveFee update result:', upData, upErr)
-  if(upErr||!upData||upData.length===0){
+  if(upErr){
+    btn.disabled=false;btn.textContent='保存する'
+    toast('UPDATEエラー: '+upErr.message)
+    return
+  }
+  if(!upData||upData.length===0){
     // updateで0行 → insertを試みる
+    toast('UPDATE 0行→INSERT試みます castId='+castIdNum)
+    await new Promise(r=>setTimeout(r,1500))
     const{data:inData,error:inErr}=await sb.from('cast_fees').insert({cast_id:castIdNum,...payloadUpdate}).select()
-    console.log('saveFee insert result:', inData, inErr)
     if(inErr){
       btn.disabled=false;btn.textContent='保存する'
-      toast('保存エラー: '+inErr.message)
+      toast('INSERTエラー: '+inErr.message)
       return
     }
+    toast('INSERT成功 op_isho='+(inData?.[0]?.op_isho??'?'))
+  } else {
+    toast('UPDATE成功 行数='+upData.length+' op_isho='+(upData[0]?.op_isho??'?'))
   }
+  await new Promise(r=>setTimeout(r,2000))
   btn.disabled=false;btn.textContent='保存する'
   sheetFee={...sheetFee,...payloadUpdate}
   toast('保存しました！');closeSheet('fee')
