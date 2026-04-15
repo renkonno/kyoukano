@@ -754,6 +754,36 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- ===== キャスト接客メモログシート ===== -->
+<div class="overlay" id="cast-memo-log-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('cast-memo-log')">✕</button>
+    <div class="sh-title" id="cast-memo-log-title">接客メモ履歴</div>
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
+      <button class="cal-nav-btn" onclick="castMemoLogMove(-1)">‹</button>
+      <div style="flex:1;text-align:center;font-size:.9rem;font-weight:700" id="cast-memo-log-month">-</div>
+      <button class="cal-nav-btn" onclick="castMemoLogMove(1)">›</button>
+    </div>
+    <div id="cast-memo-log-body"><div class="spin">読み込み中...</div></div>
+  </div>
+</div>
+
+<!-- ===== キャスト接客メモログシート ===== -->
+<div class="overlay" id="cast-memo-log-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('cast-memo-log')">✕</button>
+    <div class="sh-title" id="cast-memo-log-title">接客メモ履歴</div>
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
+      <button class="cal-nav-btn" onclick="castMemoLogMove(-1)">‹</button>
+      <div style="flex:1;text-align:center;font-size:.9rem;font-weight:700" id="cast-memo-log-month">-</div>
+      <button class="cal-nav-btn" onclick="castMemoLogMove(1)">›</button>
+    </div>
+    <div id="cast-memo-log-body"><div class="spin">読み込み中...</div></div>
+  </div>
+</div>
+
 <!-- ===== 割引種別設定シート（キャストごと店落ち/委託金設定） ===== -->
 <div class="overlay" id="cast-disc-type-overlay">
   <div class="sheet">
@@ -1158,7 +1188,7 @@ async function submitShift(){
   let err
   if(existing){const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error}
   else{const r=await sb.from('shifts').insert(payload);err=r.error}
-  if(err){toast('エラーが発生しました');return}
+  if(err){toast('保存エラー: '+(err.message||JSON.stringify(err)));console.error('saveWork error:',err);return}
   toast('申請しました！')
   closeSheet('shift-req')
   selectedDate=null; loadCal()
@@ -2836,13 +2866,22 @@ async function saveWork(){
   const hoshoAppliedSave=hoshoSave>0&&net<hoshoSave
   if(hoshoAppliedSave) net=hoshoSave
   const shopDrop=totalSales-net-discFromShop
-  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,hosho:hoshoSave,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  // hosho はカラムが存在しない可能性があるため sessions の metadata に格納
+  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  // hoshoがある場合はsessionsのメタ情報として保存（works.hoshoカラムがあれば別途試みる）
+  if(hoshoSave>0) payload.hosho=hoshoSave
   const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
   let err
   if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
   else{const r=await sb.from('works').insert(payload);err=r.error}
+  // hoshoカラムがない場合はhoshoを除いて再試行
+  if(err&&err.message&&err.message.includes('hosho')){
+    const p2={...payload};delete p2.hosho
+    if(ex){const r=await sb.from('works').update(p2).eq('id',ex.id);err=r.error}
+    else{const r=await sb.from('works').insert(p2);err=r.error}
+  }
   btn.disabled=false;btn.textContent='保存する'
-  if(err){toast('エラーが発生しました');return}
+  if(err){toast('保存エラー: '+(err.message||JSON.stringify(err)));console.error('saveWork error:',err);return}
   toast('保存しました！');closeSheet('work')
 }
 
@@ -2877,6 +2916,7 @@ async function loadCastMgmt(){
       <div class="cast-btns">
         <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">委託金設定</button>
         <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
+        <button class="btn btn-purple btn-xs" onclick="openCastMemoLog(${c.id},'${c.name}')">接客メモ</button>
         <button class="btn btn-red btn-xs" onclick="toggleActive(${c.id},true)">退店</button>
       </div>
     </div>`
@@ -3058,19 +3098,20 @@ async function saveFee(){
     interval_min:g('f-interval'),
     joined_at:document.getElementById('f-joined-at')?.value||null
   }
-  const{error:feeErr}=await sb.from('cast_fees').upsert(payload,{onConflict:'cast_id'})
-  if(feeErr){
-    // upsertが失敗した場合はupdate/insertを試みる
-    const{data:ex}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
-    if(ex){
-      const{error:upErr}=await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
-      if(upErr){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+upErr.message);return}
-    } else {
-      const{error:inErr}=await sb.from('cast_fees').insert(payload)
-      if(inErr){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+inErr.message);return}
-    }
+  // upsertではなく確実にupdate→なければinsertで保存
+  const{data:exFee}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
+  let feeErr=null
+  if(exFee){
+    const{error:upErr}=await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
+    feeErr=upErr
+  } else {
+    const{error:inErr}=await sb.from('cast_fees').insert(payload)
+    feeErr=inErr
   }
   btn.disabled=false;btn.textContent='保存する'
+  if(feeErr){toast('保存エラー: '+feeErr.message);console.error('saveFee error:',feeErr);return}
+  // 保存後にsheetFeeキャッシュを更新（次回openWorkSheetで最新値を使うため）
+  sheetFee={...sheetFee,...payload}
   toast('保存しました！');closeSheet('fee')
 }
 
@@ -3495,7 +3536,7 @@ async function openShiftReservations(shiftId,castName){
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
           <span style="font-size:.75rem;color:var(--text3)">${r.checkin_time?.slice(0,5)||'--:--'}〜${r.checkout_time?.slice(0,5)||'--:--'}</span>
-          <span style="font-size:.92rem;font-weight:700;margin-left:.4rem;color:var(--accent)">${r.customer_name||''}</span>
+          <span style="font-size:.92rem;font-weight:700;margin-left:.4rem;color:var(--accent)">${r.customer_name||''}</span>${r.customer_no?`<span style="font-size:.72rem;color:var(--text3);margin-left:.3rem">No.${r.customer_no}</span>`:''}
         </div>
         <span style="font-size:.7rem;color:var(--text3)">詳細 ›</span>
       </div>
@@ -3773,52 +3814,57 @@ function openAddOptionToRv(rvId, cacheKey){
   const availOpts=(opts||[]).filter(o=>o.name&&o.price>0)
   if(!availOpts.length){toast('オプションが設定されていません');return}
   const currentOpts=(r.options||'').split(',').filter(Boolean)
-  // プルダウンシートを動的に生成
   const existingSheet=document.getElementById('add-opt-sheet')
   if(existingSheet) existingSheet.remove()
-  const optSelOpts=availOpts.map(o=>'<option value="'+o.name+'">'+o.name+' (¥'+o.price.toLocaleString()+')</option>').join('')
+  // チェックボックスで複数選択
+  const optCheckboxes=availOpts.map(o=>{
+    const already=currentOpts.includes(o.name)
+    return `<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" class="add-opt-chk" data-name="${o.name}" ${already?'checked disabled':''} style="width:20px;height:20px;accent-color:var(--accent)">
+      <span style="flex:1;font-size:.88rem">${o.name} <span style="color:var(--text3)">¥${o.price.toLocaleString()}</span></span>
+      ${already?'<span style="font-size:.65rem;color:var(--text3)">登録済</span>':''}
+    </label>`
+  }).join('')
   const sheet=document.createElement('div')
   sheet.id='add-opt-sheet'
-  sheet.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:1.2rem;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)'
-  sheet.innerHTML='<div style="font-size:.9rem;font-weight:700;margin-bottom:.75rem">オプションを追加</div>'
-    +'<div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">現在: '+(currentOpts.join('・')||'なし')+'</div>'
-    +'<select id="add-opt-sel" class="fi" style="margin-bottom:.5rem"><option value="">-- 選択してください --</option>'+optSelOpts+'</select>'
-    +'<div style="margin-bottom:.75rem"><div class="fi-lbl">支払い方法</div>'
+  sheet.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:1.2rem;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15);max-height:80vh;overflow-y:auto'
+  sheet.innerHTML='<div style="font-size:.9rem;font-weight:700;margin-bottom:.75rem">オプションを追加（複数選択可）</div>'
+    +'<div style="margin-bottom:.75rem">'+optCheckboxes+'</div>'
+    +'<div style="margin-bottom:.75rem"><div class="fi-lbl">追加オプションの支払い方法</div>'
     +'<select id="add-opt-pay-sel" class="fi"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">'
     +'<button class="btn btn-gray" onclick="closeAddOptSheet()">キャンセル</button>'
-    +'<button class="btn btn-gold" onclick="confirmAddOpt('+rvId+',\''+cacheKey+'\')">追加する</button>'
+    +'<button class="btn btn-gold" id="btn-confirm-add-opt">追加する</button>'
     +'</div>'
   document.body.appendChild(sheet)
+  document.getElementById('btn-confirm-add-opt').addEventListener('click',()=>confirmAddOpt(rvId,cacheKey))
 }
 
 function closeAddOptSheet(){const s=document.getElementById('add-opt-sheet');if(s)s.remove()}
 
 async function confirmAddOpt(rvId, cacheKey){
-  const sel=document.getElementById('add-opt-sel')
-  const optName=sel?.value
   const payMethod=document.getElementById('add-opt-pay-sel')?.value||'現金'
-  if(!optName){toast('オプションを選択してください');return}
+  const selected=[...document.querySelectorAll('.add-opt-chk:checked:not(:disabled)')].map(cb=>cb.dataset.name)
+  if(!selected.length){toast('オプションを選択してください');return}
   document.getElementById('add-opt-sheet')?.remove()
   const rvs=window._rvDetailCache?.[cacheKey]
   const r=rvs?.find(x=>x.id===rvId)
   if(!r)return
   const currentOpts=(r.options||'').split(',').filter(Boolean)
-  if(currentOpts.includes(optName)){toast('すでに追加されています');return}
-  const newOpts=[...currentOpts,optName]
-  // paymentにオプション支払い方法を追加
+  const newOpts=[...new Set([...currentOpts,...selected])]
   let pj={}
   try{pj=JSON.parse(r.payment||'{}')}catch(e){}
-  pj['op_'+optName]=payMethod
+  selected.forEach(name=>{pj['op_'+name]=payMethod})
   const newPayment=JSON.stringify(pj)
   const{error}=await sb.from('reservations').update({options:newOpts.join(','),payment:newPayment}).eq('id',rvId)
   if(error){toast('エラー: '+error.message);return}
-  toast(optName+'を追加しました')
+  toast(selected.join('・')+'を追加しました')
   if(window._rvDetailCache?.[cacheKey]){
     const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
     if(idx>=0) window._rvDetailCache[cacheKey][idx]={...window._rvDetailCache[cacheKey][idx],options:newOpts.join(','),payment:newPayment}
+    window._skipBodyCacheOnce=true
+    showReservationDetail(idx,cacheKey)
   }
-  showReservationDetail(rvs.findIndex(x=>x.id===rvId),cacheKey)
 }
 
 // ── 延長処理 ──
@@ -4037,6 +4083,75 @@ async function saveCastDiscTypes(){
   if(inserts.length)await sb.from('cast_discounts').insert(inserts)
   toast('保存しました');closeSheet('cast-disc-type')
 }
+
+// ── キャスト接客メモログ ──
+let castMemoLogCastId=null, castMemoLogCastName='', castMemoLogMonth=null
+
+async function openCastMemoLog(castId, name){
+  castMemoLogCastId=castId
+  castMemoLogCastName=name
+  castMemoLogMonth=ym(new Date())
+  document.getElementById('cast-memo-log-title').textContent=name+' の接客メモ'
+  document.getElementById('cast-memo-log-overlay').classList.add('on')
+  loadCastMemoLog()
+}
+
+function castMemoLogMove(d){
+  castMemoLogMonth=addMonth(castMemoLogMonth,d)
+  loadCastMemoLog()
+}
+
+async function loadCastMemoLog(){
+  const[y,m]=castMemoLogMonth.split('-').map(Number)
+  document.getElementById('cast-memo-log-month').textContent=y+'年'+m+'月'
+  const body=document.getElementById('cast-memo-log-body')
+  body.innerHTML='<div class="spin">読み込み中...</div>'
+  const monthStart=castMemoLogMonth+'-01'
+  const monthEnd=nextYM(castMemoLogMonth)+'-01'
+  // cast_nameでそのキャストのメモを取得（visit_dateで月絞り込み）
+  const{data:memos}=await sb.from('customer_visits')
+    .select('*')
+    .eq('cast_name',castMemoLogCastName)
+    .not('cast_memo','is',null)
+    .neq('cast_memo','')
+    .gte('visit_date',monthStart)
+    .lt('visit_date',monthEnd)
+    .order('visit_date',{ascending:false})
+  if(!memos||!memos.length){
+    body.innerHTML='<div class="empty">この月のメモはありません</div>'
+    return
+  }
+  // customer_idでグループ化して顧客情報と紐付け
+  const custIds=[...new Set(memos.map(m=>m.customer_id).filter(Boolean))]
+  let custMap={}
+  if(custIds.length){
+    const{data:custs}=await sb.from('customers').select('id,customer_no,name').in('id',custIds)
+    if(custs) custs.forEach(c=>{custMap[c.id]=c})
+  }
+  // 顧客ごとにまとめる
+  const byCustomer={}
+  memos.forEach(m=>{
+    const cid=m.customer_id
+    if(!byCustomer[cid]) byCustomer[cid]=[]
+    byCustomer[cid].push(m)
+  })
+  let html=`<div style="font-size:.78rem;color:var(--text3);margin-bottom:.75rem">月間メモ件数：<strong>${memos.length}件</strong></div>`
+  Object.entries(byCustomer).forEach(([cid,ms])=>{
+    const cust=custMap[cid]
+    const custLabel=cust?`No.${cust.customer_no}　${cust.name}`:`顧客ID:${cid}`
+    html+=`<div class="card" style="margin-bottom:.55rem">
+      <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem;color:var(--accent)">${custLabel}</div>`
+    ms.forEach(m=>{
+      html+=`<div style="padding:.35rem 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:.72rem;color:var(--text3);margin-bottom:.15rem">${m.visit_date||''}</div>
+        <div style="font-size:.84rem;line-height:1.5">${m.cast_memo||''}</div>
+      </div>`
+    })
+    html+=`<div style="font-size:.68rem;color:var(--text3);margin-top:.3rem;text-align:right">${ms.length}件</div></div>`
+  })
+  body.innerHTML=html
+}
+
 
 // ── 店舗料金設定に割引リスト読み込みを追加 ──
 async function loadStoreDiscList(){
