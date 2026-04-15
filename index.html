@@ -3532,11 +3532,12 @@ function showReservationDetail(idx,cacheKey){
       ${cardDetail.length?`<div style="font-size:.68rem;color:var(--text3)">${cardDetail.join('、')}</div>`:''}
     </div>`:''}
   </div>`:''
-  // 延長・訂正保存からの再表示の場合はbodyCacheを上書きしない
-  if(!window._skipBodyCacheOnce){
-    window._rvDetailBodyCache=document.getElementById('rv-detail-body').innerHTML
+  // 詳細画面が既に開いていれば bodyCache を上書きしない（延長・訂正保存後の再表示）
+  const _bodyNow=document.getElementById('rv-detail-body').innerHTML
+  const _isDetailOpen=_bodyNow.includes('backToRvList')
+  if(!_isDetailOpen){
+    window._rvDetailBodyCache=_bodyNow
   }
-  window._skipBodyCacheOnce=false
   window._currentRvId=r.id
   window._currentRvCacheKey=cacheKey
   const detail=`
@@ -3661,9 +3662,9 @@ async function saveReservationEdit(rvId,cacheKey){
   const shimei=document.getElementById('edit-rv-shimei')?.value
   const course=document.getElementById('edit-rv-course')?.value
   const note=document.getElementById('edit-rv-note')?.value.trim()
-  const payment=document.getElementById('edit-rv-payment')?.value||null
   if(!name){toast('お客様名を入力してください');return}
   const finalName=name.endsWith('様')?name:name+'様'
+  // payment は既存値を保持（edit-rv-payment フォームは存在しないため上書きしない）
   const{error}=await sb.from('reservations').update({
     customer_name:finalName,
     checkin_time:checkin||null,
@@ -3671,8 +3672,7 @@ async function saveReservationEdit(rvId,cacheKey){
     is_new:isNew==='true',
     shimei_type:shimei||null,
     course:course||null,
-    note:note||null,
-    payment:payment||null
+    note:note||null
   }).eq('id',rvId)
   if(error){toast('エラー: '+error.message);return}
   toast('訂正しました')
@@ -3681,8 +3681,8 @@ async function saveReservationEdit(rvId,cacheKey){
     const idx=window._rvDetailCache[cacheKey].findIndex(r=>r.id===rvId)
     if(idx>=0){
       const updated=window._rvDetailCache[cacheKey][idx]
-      window._rvDetailCache[cacheKey][idx]={...updated,customer_name:finalName,checkin_time:checkin||null,checkout_time:checkout||null,is_new:isNew==='true',shimei_type:shimei,course,note,payment}
-      window._skipBodyCacheOnce=true
+      // payment は変更しない（延長情報などを保持するため）
+      window._rvDetailCache[cacheKey][idx]={...updated,customer_name:finalName,checkin_time:checkin||null,checkout_time:checkout||null,is_new:isNew==='true',shimei_type:shimei,course,note}
       showReservationDetail(idx, cacheKey)
     } else {
       backToRvList()
