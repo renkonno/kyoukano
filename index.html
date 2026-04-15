@@ -560,6 +560,9 @@ tr:last-child td{border-bottom:none}
     <div class="fg"><label>雑費（円）<span style="font-size:.7rem;color:var(--text3)">（自動：0本=¥0 / 1〜2本=¥1,000 / 3本〜=¥2,000）</span></label>
       <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="this.dataset.manual='true';calcTotal2()" placeholder="0">
     </div>
+    <div class="fg"><label>保証（円）<span style="font-size:.7rem;color:var(--text3)">（予約0本時に店が支払う最低保証額）</span></label>
+      <input type="number" class="fi2" id="w-hosho" value="0" min="0" step="100" onchange="calcTotal2()" placeholder="0">
+    </div>
     <div class="sal-hero" style="margin-bottom:.75rem">
       <div class="sal-lbl">本日の集計</div>
       <div id="w-breakdown"></div>
@@ -2562,6 +2565,7 @@ async function openWorkSheet(shiftId,castName,date,castId){
   sheetDiscs=discs||[]
   const{data:w}=await sb.from('works').select('*').eq('cast_id',castId).eq('date',date).single()
   document.getElementById('session-list').innerHTML=''
+  if(document.getElementById('w-hosho')) document.getElementById('w-hosho').value='0'
   // 雑費の自動計算設定
   const autoMisc=sheetFee.misc_enabled!==false
   if(autoMisc) document.getElementById('w-misc').value=sheetFee.misc_0??0
@@ -2569,6 +2573,7 @@ async function openWorkSheet(shiftId,castName,date,castId){
   if(w&&w.sessions&&w.sessions.length){
     // 保存済みデータがあればそれを使う
     if(w.misc) document.getElementById('w-misc').value=w.misc
+    if(w.hosho&&document.getElementById('w-hosho')) document.getElementById('w-hosho').value=w.hosho
     w.sessions.forEach(s=>addSession(s))
   } else {
     // 予約データから自動生成
@@ -2753,12 +2758,20 @@ function calcTotal2(){
     })
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
-  const net=totalBack-discFromBack-misc
+  const hosho=parseInt(document.getElementById('w-hosho')?.value)||0
+  let net=totalBack-discFromBack-misc
+  // 保証：通常の委託金より保証が高い場合、差額を店が負担
+  const hoshoApplied=hosho>0&&net<hosho
+  if(hoshoApplied) net=hosho
   const shopDrop=totalSales-net-discFromShop
   let bd=''
   bd+=`<div class="sal-row"><span class="sal-rl">総売上</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
   if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
-  bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(net)}</span></div>`
+  if(hoshoApplied){
+    bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv" style="color:var(--rtx);font-weight:700">${fmt(net)} <span style="font-size:.72rem">（保証）</span></span></div>`
+  } else {
+    bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(net)}</span></div>`
+  }
   bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
   if(discFromBack>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（委託金引き）</span><span class="sal-rv neg">-${fmt(discFromBack)}</span></div>`
   if(discFromShop>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（店落ち引き）</span><span class="sal-rv neg">-${fmt(discFromShop)}</span></div>`
@@ -2818,9 +2831,12 @@ async function saveWork(){
     sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
     totalSales+=sessionSales;totalBack+=cback+sback+optBack+extBackTotal;totalCount++
   })
-  const net=totalBack-discFromBack-misc
+  const hoshoSave=parseInt(document.getElementById('w-hosho')?.value)||0
+  let net=totalBack-discFromBack-misc
+  const hoshoAppliedSave=hoshoSave>0&&net<hoshoSave
+  if(hoshoAppliedSave) net=hoshoSave
   const shopDrop=totalSales-net-discFromShop
-  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,hosho:hoshoSave,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
   const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
   let err
   if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
