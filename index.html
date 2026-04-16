@@ -3294,8 +3294,9 @@ async function openStoreSettings(){
     const cext=cs.find(c=>c.name.includes('延長'));if(cext) document.getElementById('st-ext').value=cext.price
   }
   const{data:ops}=await sb.from('options').select('*').order('id')
+  // DBのoptions名前一覧を表示してデバッグ
+  if(ops) toast('DB options: '+(ops.map(o=>o.id+':'+o.name+':'+o.price).join(' / ')),5000)
   if(ops&&ops.length>=3){
-    // id昇順で1番目=極液、2番目=衣装①、3番目=衣装②として固定
     document.getElementById('st-op1').value=ops[0].price
     document.getElementById('st-op2').value=ops[1].price
     document.getElementById('st-op3').value=ops[2].price
