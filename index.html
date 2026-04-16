@@ -3294,15 +3294,16 @@ async function openStoreSettings(){
     const cext=cs.find(c=>c.name.includes('延長'));if(cext) document.getElementById('st-ext').value=cext.price
   }
   const{data:ops}=await sb.from('options').select('*').order('id')
-  if(ops&&ops.length){
-    // id順で最初の3件をそのまま使う（極液・衣装①・衣装②の順を想定）
-    // nameで検索せず、nameに「衣装」が含まれるか「極液」かで判定
-    const opGokueki=ops.find(o=>o.name.includes('極液'))
-    const opIsho1=ops.find(o=>o.name.includes('衣装')&&!o.name.includes('②')&&!o.name.includes('2'))
-    const opIsho2=ops.find(o=>o.name.includes('衣装')&&(o.name.includes('②')||o.name.includes('2')))
-    if(opGokueki) document.getElementById('st-op1').value=opGokueki.price
-    if(opIsho1) document.getElementById('st-op2').value=opIsho1.price
-    if(opIsho2) document.getElementById('st-op3').value=opIsho2.price
+  if(ops&&ops.length>=3){
+    // id昇順で1番目=極液、2番目=衣装①、3番目=衣装②として固定
+    document.getElementById('st-op1').value=ops[0].price
+    document.getElementById('st-op2').value=ops[1].price
+    document.getElementById('st-op3').value=ops[2].price
+  } else if(ops&&ops.length===2){
+    document.getElementById('st-op1').value=ops[0].price
+    document.getElementById('st-op2').value=ops[1].price
+  } else if(ops&&ops.length===1){
+    document.getElementById('st-op1').value=ops[0].price
   }
   const{data:ss}=await sb.from('store_settings').select('*').single()
   if(ss){
@@ -3330,19 +3331,13 @@ async function saveStoreSettings(){
       if(c) await sb.from('courses').update({price:u.price}).eq('id',c.id)
     }
   }
-  // オプション料金を保存（nameの完全一致ではなく部分一致で検索）
+  // オプション料金をid昇順で取得し、順番通りに更新
   const{data:ops}=await sb.from('options').select('*').order('id')
-  const opGokueki=ops?ops.find(o=>o.name.includes('極液')):null
-  const opIsho1=ops?ops.find(o=>o.name.includes('衣装')&&!o.name.includes('②')&&!o.name.includes('2')):null
-  const opIsho2=ops?ops.find(o=>o.name.includes('衣装')&&(o.name.includes('②')||o.name.includes('2'))):null
   const p1=gv('st-op1'),p2=gv('st-op2'),p3=gv('st-op3')
   let errMsg=''
-  if(opGokueki){const r=await sb.from('options').update({price:p1}).eq('id',opGokueki.id);if(r.error)errMsg+='極液:'+r.error.message+' '}
-  else{const r=await sb.from('options').insert({name:'極液',price:p1});if(r.error)errMsg+='極液insert:'+r.error.message+' '}
-  if(opIsho1){const r=await sb.from('options').update({price:p2}).eq('id',opIsho1.id);if(r.error)errMsg+='衣装①:'+r.error.message+' '}
-  else{const r=await sb.from('options').insert({name:'衣装チェンジ①',price:p2});if(r.error)errMsg+='衣装①insert:'+r.error.message+' '}
-  if(opIsho2){const r=await sb.from('options').update({price:p3}).eq('id',opIsho2.id);if(r.error)errMsg+='衣装②:'+r.error.message+' '}
-  else{const r=await sb.from('options').insert({name:'衣装チェンジ②',price:p3});if(r.error)errMsg+='衣装②insert:'+r.error.message+' '}
+  if(ops&&ops.length>=1){const r=await sb.from('options').update({price:p1}).eq('id',ops[0].id);if(r.error)errMsg+='op1:'+r.error.message+' '}
+  if(ops&&ops.length>=2){const r=await sb.from('options').update({price:p2}).eq('id',ops[1].id);if(r.error)errMsg+='op2:'+r.error.message+' '}
+  if(ops&&ops.length>=3){const r=await sb.from('options').update({price:p3}).eq('id',ops[2].id);if(r.error)errMsg+='op3:'+r.error.message+' '}
   if(errMsg){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+errMsg);return}
   // 指名料をstore_settingsに保存
   const shimeiData={shimei_free:gv('st-shimei-free'),shimei_net:gv('st-shimei-net'),shimei_hon:gv('st-shimei-hon')}
@@ -3352,24 +3347,21 @@ async function saveStoreSettings(){
     if(ssx){await sb.from('store_settings').update(shimeiData).eq('id',ssx.id)}
     else{await sb.from('store_settings').insert(shimeiData)}
   }
-  // 保存後にDBから最新データを取得してキャッシュ＆画面を更新
+  // 保存後DBから再取得してキャッシュと画面を更新
   const{data:newCs}=await sb.from('courses').select('*').order('price')
   courses=newCs||[]
   const{data:newOps}=await sb.from('options').select('*').order('id')
   opts=newOps||[]
   const{data:newSs}=await sb.from('store_settings').select('*').single()
   storeSettings=newSs||{}
-  // 保存後の値を画面に反映（次回開いたときと同じ状態にする）
-  if(newOps&&newOps.length){
-    const no1=newOps.find(o=>o.name.includes('極液'))
-    const no2=newOps.find(o=>o.name.includes('衣装')&&!o.name.includes('②')&&!o.name.includes('2'))
-    const no3=newOps.find(o=>o.name.includes('衣装')&&(o.name.includes('②')||o.name.includes('2')))
-    if(no1) document.getElementById('st-op1').value=no1.price
-    if(no2) document.getElementById('st-op2').value=no2.price
-    if(no3) document.getElementById('st-op3').value=no3.price
-  }
+  // 保存直後に画面の値もDB値で上書き（次回開いたときと同じ状態にする）
+  if(newOps&&newOps.length>=1) document.getElementById('st-op1').value=newOps[0].price
+  if(newOps&&newOps.length>=2) document.getElementById('st-op2').value=newOps[1].price
+  if(newOps&&newOps.length>=3) document.getElementById('st-op3').value=newOps[2].price
   btn.disabled=false;btn.textContent='保存する'
-  toast('料金を保存しました！');closeSheet('store')
+  // DB保存後の実際の値を確認用トーストで表示
+  const dbVal=newOps&&newOps.length>=2?newOps[1].price:'?'
+  toast('保存完了！衣装①DB値='+dbVal+'円',3000);closeSheet('store')
 }
 
 // ── キャスト用シフト訂正・取消 ──
