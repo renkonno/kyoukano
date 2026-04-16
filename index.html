@@ -728,7 +728,7 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ①</div><input type="number" class="fee-input" id="st-op2" min="0" step="100"><span class="fee-unit">円</span></div>
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②</div><input type="number" class="fee-input" id="st-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
-    <button class="btn btn-gold btn-full" onclick="alert('保存ボタンOK');saveStoreSettings()" id="btn-save-store">保存する</button>
+    <button class="btn btn-gold btn-full" onclick="saveStoreSettings()" id="btn-save-store">保存する</button>
     <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem">
       <div class="fee-sec-title">🏷️ 店舗共通割引設定</div>
       <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">全キャスト共通の割引を登録。各セラピストの委託金設定で「店落ち/委託金」を選択できます。</div>
@@ -3319,51 +3319,47 @@ async function saveStoreSettings(){
   const btn=document.getElementById('btn-save-store')
   btn.disabled=true;btn.textContent='保存中...'
   const gv=id=>{const el=document.getElementById(id);if(!el)return 0;const v=parseInt(el.value,10);return isNaN(v)?0:v}
-  const{data:cs}=await sb.from('courses').select('*').order('price')
-  if(cs){
-    const updates=[
-      {name:'50分',price:gv('st-c50')},{name:'80分',price:gv('st-c80')},
-      {name:'100分',price:gv('st-c100')},{name:'130分',price:gv('st-c130')},
-      {name:'延長',price:gv('st-ext')}
-    ]
-    for(const u of updates){
-      const c=cs.find(x=>x.name.includes(u.name))
-      if(c) await sb.from('courses').update({price:u.price}).eq('id',c.id)
+  try{
+    const{data:cs,error:csErr}=await sb.from('courses').select('*').order('price')
+    if(csErr){toast('コース取得エラー:'+csErr.message,5000);btn.disabled=false;btn.textContent='保存する';return}
+    if(cs){
+      for(const u of [{name:'50分',id:'st-c50'},{name:'80分',id:'st-c80'},{name:'100分',id:'st-c100'},{name:'130分',id:'st-c130'},{name:'延長',id:'st-ext'}]){
+        const c=cs.find(x=>x.name.includes(u.name))
+        if(c){const r=await sb.from('courses').update({price:gv(u.id)}).eq('id',c.id);if(r.error){toast('コースエラー('+u.name+'):'+r.error.message,5000);btn.disabled=false;btn.textContent='保存する';return}}
+      }
     }
+    const{data:ops,error:opsErr}=await sb.from('options').select('*').order('id')
+    if(opsErr){toast('オプション取得エラー:'+opsErr.message,5000);btn.disabled=false;btn.textContent='保存する';return}
+    if(ops){
+      const opG=ops.find(o=>o.name==='極液')
+      const opI1=ops.find(o=>o.name==='衣装チェンジ①')
+      const opI2=ops.find(o=>o.name==='衣装チェンジ②')
+      toast('opI1='+(opI1?opI1.id:'null')+' gv='+gv('st-op2'),4000)
+      if(opG){const r=await sb.from('options').update({price:gv('st-op1')}).eq('id',opG.id);if(r.error){toast('エラー(極液):'+r.error.message,5000);btn.disabled=false;btn.textContent='保存する';return}}
+      if(opI1){const r=await sb.from('options').update({price:gv('st-op2')}).eq('id',opI1.id);toast('衣装①: '+gv('st-op2')+'円 err='+(r.error?r.error.message:'なし'),5000);if(r.error){btn.disabled=false;btn.textContent='保存する';return}}
+      if(opI2){const r=await sb.from('options').update({price:gv('st-op3')}).eq('id',opI2.id);if(r.error){toast('エラー(衣装②):'+r.error.message,5000);btn.disabled=false;btn.textContent='保存する';return}}
+    }
+    const shimeiData={shimei_free:gv('st-shimei-free'),shimei_net:gv('st-shimei-net'),shimei_hon:gv('st-shimei-hon')}
+    const{error:ssErr}=await sb.from('store_settings').upsert({id:1,...shimeiData},{onConflict:'id'})
+    if(ssErr){const{data:ssx}=await sb.from('store_settings').select('id').maybeSingle();if(ssx)await sb.from('store_settings').update(shimeiData).eq('id',ssx.id);else await sb.from('store_settings').insert(shimeiData)}
+    const{data:newOps}=await sb.from('options').select('*').order('id')
+    opts=newOps||[]
+    if(newOps){
+      const no1=newOps.find(o=>o.name==='極液')
+      const no2=newOps.find(o=>o.name==='衣装チェンジ①')
+      const no3=newOps.find(o=>o.name==='衣装チェンジ②')
+      if(no1) document.getElementById('st-op1').value=no1.price
+      if(no2) document.getElementById('st-op2').value=no2.price
+      if(no3) document.getElementById('st-op3').value=no3.price
+    }
+    btn.disabled=false;btn.textContent='保存する'
+    toast('料金を保存しました！');closeSheet('store')
+  }catch(e){
+    toast('例外エラー:'+e.message,5000)
+    btn.disabled=false;btn.textContent='保存する'
   }
-  const{data:ops}=await sb.from('options').select('*').order('id')
-  if(ops){
-    const opG=ops.find(o=>o.name==='極液')
-    const opI1=ops.find(o=>o.name==='衣装チェンジ①')
-    const opI2=ops.find(o=>o.name==='衣装チェンジ②')
-    if(opG){const r=await sb.from('options').update({price:gv('st-op1')}).eq('id',opG.id);if(r.error){btn.disabled=false;btn.textContent='保存する';toast('エラー(極液):'+r.error.message);return}}
-    if(opI1){const r=await sb.from('options').update({price:gv('st-op2')}).eq('id',opI1.id);toast('衣装①保存: id='+opI1.id+' price='+gv('st-op2')+' err='+(r.error?r.error.message:'なし'),5000);if(r.error){btn.disabled=false;btn.textContent='保存する';toast('エラー(衣装①):'+r.error.message);return}}
-    if(opI2){const r=await sb.from('options').update({price:gv('st-op3')}).eq('id',opI2.id);if(r.error){btn.disabled=false;btn.textContent='保存する';toast('エラー(衣装②):'+r.error.message);return}}
-  }
-  const shimeiData={shimei_free:gv('st-shimei-free'),shimei_net:gv('st-shimei-net'),shimei_hon:gv('st-shimei-hon')}
-  const{error:ssErr}=await sb.from('store_settings').upsert({id:1,...shimeiData},{onConflict:'id'})
-  if(ssErr){
-    const{data:ssx}=await sb.from('store_settings').select('id').maybeSingle()
-    if(ssx){await sb.from('store_settings').update(shimeiData).eq('id',ssx.id)}
-    else{await sb.from('store_settings').insert(shimeiData)}
-  }
-  const{data:newCs}=await sb.from('courses').select('*').order('price')
-  courses=newCs||[]
-  const{data:newOps}=await sb.from('options').select('*').order('id')
-  opts=newOps||[]
-  const{data:newSs}=await sb.from('store_settings').select('*').single()
-  storeSettings=newSs||{}
-  if(newOps){
-    const no1=newOps.find(o=>o.name==='極液')
-    const no2=newOps.find(o=>o.name==='衣装チェンジ①')
-    const no3=newOps.find(o=>o.name==='衣装チェンジ②')
-    if(no1) document.getElementById('st-op1').value=no1.price
-    if(no2) document.getElementById('st-op2').value=no2.price
-    if(no3) document.getElementById('st-op3').value=no3.price
-  }
-  btn.disabled=false;btn.textContent='保存する'
-  toast('料金を保存しました！');closeSheet('store')
 }
+
 async function loadStoreDiscList(){
   const area=document.getElementById('store-disc-list')
   if(!area)return
