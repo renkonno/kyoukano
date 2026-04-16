@@ -412,7 +412,7 @@ tr:last-child td{border-bottom:none}
         <div style="font-size:1rem;font-weight:700">キャスト管理</div>
         <div style="display:flex;gap:.35rem">
           <button class="btn btn-red btn-sm2" onclick="openInactiveSheet()">退店済み</button>
-          <button class="btn btn-blue btn-sm2" onclick="openStoreSettings()">⚙️ 料金設定</button>
+          <button class="btn btn-blue btn-sm2" onclick="alert('OK');openStoreSettings()">⚙️ 料金設定</button>
           <button class="btn btn-gold btn-sm2" onclick="openAddCast()">＋ 追加</button>
         </div>
       </div>
@@ -3284,6 +3284,8 @@ async function deleteWork(id){
 
 // ── 店舗料金設定 ──
 async function openStoreSettings(){
+  // 念のため他のオーバーレイをすべて閉じる
+  document.querySelectorAll('.overlay.on').forEach(el=>el.classList.remove('on'))
   await loadStoreDiscList()
   const{data:cs}=await sb.from('courses').select('*').order('price')
   if(cs){
