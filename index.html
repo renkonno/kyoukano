@@ -3418,7 +3418,7 @@ async function openShiftReservations(shiftId, castName){
     const newLabel = r.is_new===true||r.is_new==='true'
       ? '<span style="font-size:.65rem;background:#4CAF50;color:#fff;padding:1px 7px;border-radius:99px;margin-left:.3rem">新規</span>'
       : '<span style="font-size:.65rem;background:var(--surface2);color:var(--text3);padding:1px 7px;border-radius:99px;margin-left:.3rem;border:1px solid var(--border)">再訪</span>'
-    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:.3rem" onclick="openRvDetail(${r.id})">
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:.3rem" onclick="openRvDetail(${r.id},${shiftId},'${castName}')">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:.92rem;font-weight:700">${i+1}. ${r.customer_name||'氏名未設定'}${newLabel}</div>
         ${r.customer_no?`<span style="font-size:.65rem;color:var(--text3)">No.${r.customer_no}</span>`:''}
@@ -3448,8 +3448,15 @@ async function openShiftReservations(shiftId, castName){
 
 // 予約詳細・修正シート
 let currentRvId = null
-async function openRvDetail(rvId){
+let currentRvShiftId = null
+let currentRvCastName = ''
+async function openRvDetail(rvId, shiftId, castName){
   currentRvId = rvId
+  if(shiftId) currentRvShiftId = shiftId
+  if(castName) currentRvCastName = castName
+  // ① 予約確認一覧シートを閉じる
+  document.getElementById('shift-reservations-overlay').classList.remove('on')
+
   const {data:r} = await sb.from('reservations').select('*').eq('id',rvId).single()
   if(!r){toast('予約データが見つかりません');return}
   const {data:courseList} = await sb.from('courses').select('*')
@@ -3469,23 +3476,82 @@ async function openRvDetail(rvId){
   const payCourse=pj.course||'現金', payShimei=pj.shimei||'現金', payOpt=pj.option||'現金'
   const cardAmt=(payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)
   const cashAmt=totalPrice-cardAmt
+
+  // ② 接客メモ取得（顧客番号がある場合）
+  let memoHtml = ''
+  let visitHtml = ''
+  if(r.customer_no){
+    const {data:custData} = await sb.from('customers').select('id,name,memo').eq('customer_no',r.customer_no).single()
+    if(custData){
+      // 店舗メモ（顧客管理のメモ欄）
+      if(custData.memo){
+        memoHtml += `<div style="background:#fffde7;border:1px solid #ffe082;border-radius:8px;padding:.5rem .75rem;font-size:.82rem;margin-bottom:.3rem">
+          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">📋 店舗メモ</div>
+          ${custData.memo}
+        </div>`
+      }
+      // ③ 接客メモ（cast_memo）
+      // キャストは自分の名前のメモのみ・店舗は全件
+      let memoQuery = sb.from('customer_visits')
+        .select('id,cast_memo,cast_name,created_at')
+        .eq('customer_id',custData.id)
+        .not('cast_memo','is',null)
+        .neq('cast_memo','')
+        .order('created_at',{ascending:false})
+        .limit(5)
+      if(!me.is_owner){
+        // キャストは自分の名前のメモのみ
+        memoQuery = memoQuery.eq('cast_name', me.name)
+      }
+      const {data:memos} = await memoQuery
+      if(memos&&memos.length){
+        memoHtml += `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">💬 接客メモ${me.is_owner?'（全キャスト）':'（自分のメモ）'}</div>`
+        memoHtml += memos.map(m=>`<div style="background:var(--surface2);border-radius:8px;padding:.4rem .7rem;font-size:.8rem;margin-bottom:.25rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
+            <span style="font-size:.65rem;color:var(--accent);font-weight:600">${m.cast_name||''}</span>
+            <span style="font-size:.62rem;color:var(--text3)">${m.created_at?.slice(0,10)||''}</span>
+          </div>
+          ${m.cast_memo}
+        </div>`).join('')
+      }
+
+      // ④ 来店履歴（キャストは自分の施術分のみ・店舗は全件）
+      let visitQuery = sb.from('customer_visits')
+        .select('visit_date,cast_name,shimei_type,course,options')
+        .eq('customer_id',custData.id)
+        .order('visit_date',{ascending:false})
+        .limit(10)
+      if(!me.is_owner){
+        visitQuery = visitQuery.eq('cast_name', me.name)
+      }
+      const {data:visits} = await visitQuery
+      const realVisits = (visits||[]).filter(v=>v.course||v.shimei_type)
+      if(realVisits.length){
+        visitHtml = `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">📅 来店履歴${me.is_owner?'（全キャスト）':'（自分の施術のみ）'}</div>`
+        visitHtml += realVisits.map(v=>`<div style="border-left:3px solid var(--accent);padding:.25rem .5rem;margin-bottom:.2rem;font-size:.78rem">
+          <span style="font-weight:600">${v.visit_date||''}</span>
+          ${me.is_owner&&v.cast_name?`<span style="font-size:.65rem;color:var(--text3);margin-left:.3rem">${v.cast_name}</span>`:''}
+          <div style="color:var(--text3);font-size:.72rem">${[v.shimei_type,v.course,v.options].filter(Boolean).join(' / ')}</div>
+        </div>`).join('')
+      }
+    }
+  }
+
   document.getElementById('rv-detail-title').textContent = r.customer_name||'予約詳細'
   document.getElementById('rv-detail-body').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:.6rem">
-      <div class="sal-hero" style="margin-bottom:.3rem">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.5rem">
-          <div style="background:var(--surface2);border-radius:10px;padding:.5rem;text-align:center">
-            <div style="font-size:.62rem;color:var(--text3)">合計金額</div>
-            <div style="font-size:.95rem;font-weight:800">${fmt(totalPrice)}</div>
-          </div>
-          <div style="background:#fff8e1;border-radius:10px;padding:.5rem;text-align:center">
-            <div style="font-size:.62rem;color:var(--text3)">💴 現金</div>
-            <div style="font-size:.95rem;font-weight:800;color:#b8860b">${fmt(cashAmt)}</div>
-          </div>
-          <div style="background:#e8f4fd;border-radius:10px;padding:.5rem;text-align:center">
-            <div style="font-size:.62rem;color:var(--text3)">💳 カード</div>
-            <div style="font-size:.95rem;font-weight:800;color:#1565c0">${fmt(cardAmt)}</div>
-          </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+        <div style="background:var(--surface2);border-radius:10px;padding:.5rem;text-align:center">
+          <div style="font-size:.62rem;color:var(--text3)">合計金額</div>
+          <div style="font-size:.95rem;font-weight:800">${fmt(totalPrice)}</div>
+        </div>
+        <div style="background:#fff8e1;border-radius:10px;padding:.5rem;text-align:center">
+          <div style="font-size:.62rem;color:var(--text3)">💴 現金</div>
+          <div style="font-size:.95rem;font-weight:800;color:#b8860b">${fmt(cashAmt)}</div>
+        </div>
+        <div style="background:#e8f4fd;border-radius:10px;padding:.5rem;text-align:center">
+          <div style="font-size:.62rem;color:var(--text3)">💳 カード</div>
+          <div style="font-size:.95rem;font-weight:800;color:#1565c0">${fmt(cardAmt)}</div>
         </div>
       </div>
       <div class="fee-sec">
@@ -3498,12 +3564,21 @@ async function openRvDetail(rvId){
         ${discs.length?`<div class="fee-row"><div class="fee-lbl">割引</div><div style="color:var(--rtx)">-${fmt(discTotal)}（${discs.join('・')}）</div></div>`:''}
         ${r.note?`<div class="fee-row"><div class="fee-lbl">備考</div><div>${r.note}</div></div>`:''}
       </div>
+      ${memoHtml}
+      ${visitHtml}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.3rem">
         <button class="btn btn-blue" onclick="openRvEdit(${r.id})">✏️ 修正する</button>
         <button class="btn btn-red" onclick="deleteRv(${r.id})">🗑 削除する</button>
       </div>
     </div>`
   document.getElementById('rv-detail-overlay').classList.add('on')
+}
+
+function backToShiftReservations(){
+  closeSheet('rv-detail')
+  if(currentRvShiftId){
+    openShiftReservations(currentRvShiftId, currentRvCastName)
+  }
 }
 
 async function deleteRv(rvId){
@@ -3587,7 +3662,7 @@ async function openRvEdit(rvId){
       <div><div class="fi-lbl">備考</div><input class="fi" id="rve-note" value="${r.note||''}"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.3rem">
         <button class="btn btn-gold" onclick="saveRvEdit(${r.id})">💾 保存する</button>
-        <button class="btn btn-gray" onclick="openRvDetail(${r.id})">← 戻る</button>
+        <button class="btn btn-gray" onclick="backToShiftReservations()">← 一覧に戻る</button>
       </div>
     </div>`
 }
