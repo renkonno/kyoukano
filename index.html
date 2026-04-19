@@ -775,18 +775,13 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<!-- ===== キャスト接客メモログシート ===== -->
-<div class="overlay" id="cast-memo-log-overlay">
+<!-- ===== 予約確認シート ===== -->
+<div class="overlay" id="shift-reservations-overlay">
   <div class="sheet">
     <div class="sh-handle"></div>
-    <button class="sh-close" onclick="closeSheet('cast-memo-log')">✕</button>
-    <div class="sh-title" id="cast-memo-log-title">接客メモ履歴</div>
-    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
-      <button class="cal-nav-btn" onclick="castMemoLogMove(-1)">‹</button>
-      <div style="flex:1;text-align:center;font-size:.9rem;font-weight:700" id="cast-memo-log-month">-</div>
-      <button class="cal-nav-btn" onclick="castMemoLogMove(1)">›</button>
-    </div>
-    <div id="cast-memo-log-body"><div class="spin">読み込み中...</div></div>
+    <button class="sh-close" onclick="closeSheet('shift-reservations')">✕</button>
+    <div class="sh-title" id="shift-reservations-title">予約確認</div>
+    <div id="shift-reservations-body"><div class="spin">読み込み中...</div></div>
   </div>
 </div>
 
@@ -3383,6 +3378,175 @@ async function deleteStoreDisc(id){
   await sb.from('cast_discounts').delete().eq('id',id)
   await loadStoreDiscList();toast('削除しました')
 }
+// ── 予約確認シート（キャスト側・店舗側共用） ──
+async function openShiftReservations(shiftId, castName){
+  document.getElementById('shift-reservations-title').textContent = castName + ' の予約確認'
+  document.getElementById('shift-reservations-overlay').classList.add('on')
+  const body = document.getElementById('shift-reservations-body')
+  body.innerHTML = '<div class="spin">読み込み中...</div>'
+  const {data:rvs, error} = await sb.from('reservations').select('*').eq('shift_id', shiftId).order('checkin_time')
+  if(error){body.innerHTML='<div class="empty">取得エラー: '+error.message+'</div>';return}
+  if(!rvs||!rvs.length){body.innerHTML='<div class="empty">予約はまだありません</div>';return}
+  body.innerHTML = rvs.map((r,i)=>{
+    let payInfo = ''
+    try{const pj=JSON.parse(r.payment||'{}');payInfo=`コース:${pj.course||'現金'} / 指名:${pj.shimei||'現金'} / OP:${pj.option||'現金'}`}catch(e){}
+    const opts = r.options ? r.options.split(',').filter(Boolean).join('・') : ''
+    const disc = r.discount ? '割引: '+r.discount : ''
+    return `<div class="item" style="flex-direction:column;align-items:stretch;gap:.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:.9rem;font-weight:700">${i+1}. ${r.customer_name||'氏名未設定'}</div>
+        ${r.customer_no?`<span style="font-size:.65rem;color:var(--text3)">No.${r.customer_no}</span>`:''}
+      </div>
+      ${r.checkin_time||r.checkout_time?`<div style="font-size:.78rem;color:var(--accent)">⏱ ${r.checkin_time?.slice(0,5)||'?'} 〜 ${r.checkout_time?.slice(0,5)||'?'}</div>`:''}
+      <div style="font-size:.78rem;color:var(--text3)">${[r.shimei_type,r.course,opts].filter(Boolean).join(' / ')}</div>
+      ${disc?`<div style="font-size:.72rem;color:var(--rtx)">${disc}</div>`:''}
+      ${payInfo?`<div style="font-size:.7rem;color:var(--text3)">💳 ${payInfo}</div>`:''}
+      ${r.note?`<div style="font-size:.75rem;color:var(--text3)">📝 ${r.note}</div>`:''}
+      ${r.is_new?'<span style="font-size:.65rem;background:#4CAF50;color:#fff;padding:1px 6px;border-radius:99px;align-self:flex-start">新規</span>':''}
+    </div>`
+  }).join('')
+}
+
+// ── キャスト：接客メモタブ ──
+let castMemoAllCustomers = []
+async function loadCastMemoPage(){
+  const area = document.getElementById('cast-memo-today-area')
+  if(!area) return
+  area.innerHTML = '<div class="spin">読み込み中...</div>'
+  // 当日の自分のシフトに紐づく予約を取得
+  const td = today()
+  const {data:shifts} = await sb.from('shifts').select('id').eq('cast_id', me.id).eq('date', td).eq('status','approved')
+  if(!shifts||!shifts.length){area.innerHTML='<div style="font-size:.8rem;color:var(--text3);margin-bottom:.5rem">本日のシフトがありません</div>';return}
+  const sids = shifts.map(s=>s.id)
+  const {data:rvs} = await sb.from('reservations').select('*').in('shift_id', sids).order('checkin_time')
+  if(!rvs||!rvs.length){area.innerHTML='<div style="font-size:.8rem;color:var(--text3);margin-bottom:.5rem">本日の予約はありません</div>';return}
+  area.innerHTML = `<div class="sec" style="margin-top:0">本日の予約（${rvs.length}件）</div>`
+  + rvs.map(r=>`<div class="item" style="flex-direction:column;align-items:stretch;gap:.2rem;margin-bottom:.4rem">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:.88rem;font-weight:600">${r.customer_name||'氏名未設定'}</div>
+      ${r.checkin_time?`<span style="font-size:.72rem;color:var(--accent)">${r.checkin_time.slice(0,5)}-${r.checkout_time?.slice(0,5)||'?'}</span>`:''}
+    </div>
+    <div style="font-size:.75rem;color:var(--text3)">${[r.shimei_type,r.course,r.options].filter(Boolean).join(' / ')}</div>
+    ${r.customer_no
+      ? `<button class="btn btn-purple btn-xs" style="align-self:flex-start;margin-top:.2rem" onclick="openCastMemoForReservation(${r.customer_no},'${(r.customer_name||'').replace(/'/g,"\\'")}')">メモを書く</button>`
+      : '<span style="font-size:.7rem;color:var(--text3)">顧客番号未登録</span>'
+    }
+  </div>`).join('')
+}
+
+async function loadCastMemoList(){
+  const area = document.getElementById('cast-memo-area')
+  if(!area) return
+  // 顧客一覧を読み込んでおく（検索用）
+  const {data} = await sb.from('customers').select('id,name,customer_no').order('customer_no')
+  castMemoAllCustomers = data||[]
+}
+
+function filterMemos(){
+  const q = document.getElementById('memo-search')?.value.trim().toLowerCase()
+  const area = document.getElementById('cast-memo-area')
+  if(!area) return
+  if(!q){area.style.display='none';area.innerHTML='';return}
+  area.style.display='block'
+  const filtered = castMemoAllCustomers.filter(c=>
+    String(c.customer_no).includes(q) ||
+    (c.name||'').toLowerCase().includes(q)
+  )
+  if(!filtered.length){area.innerHTML='<div class="empty">該当する顧客がいません</div>';return}
+  area.innerHTML = filtered.map(c=>`
+    <div class="item" style="justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:.88rem;font-weight:600">No.${c.customer_no}　${c.name}</div>
+      </div>
+      <button class="btn btn-purple btn-xs" onclick="openCastMemoForReservation(${c.customer_no},'${(c.name||'').replace(/'/g,"\\'")}')">メモ</button>
+    </div>`).join('')
+}
+
+async function openMemoCustomerSearch(){
+  // 検索欄にフォーカスするだけ（顧客一覧はloadCastMemoListで読み込み済み）
+  const input = document.getElementById('memo-search')
+  if(input){input.focus();input.value='';filterMemos()}
+}
+
+async function openCastMemoForReservation(customerNo, customerName){
+  // 顧客番号からID取得
+  const c = castMemoAllCustomers.find(x=>x.customer_no===customerNo)
+  if(!c){
+    // まだ読み込まれていない場合はDBから取得
+    const {data} = await sb.from('customers').select('id,name,customer_no').eq('customer_no',customerNo).single()
+    if(!data){toast('顧客が見つかりません');return}
+    castMemoCustomerId = data.id
+  } else {
+    castMemoCustomerId = c.id
+  }
+  document.getElementById('cast-memo-title').textContent = customerName + ' へのメモ'
+  document.getElementById('cm-memo').value = ''
+  document.getElementById('cm-date').value = today()
+  document.getElementById('cast-memo-overlay').classList.add('on')
+}
+
+// ── キャスト：接客メモ履歴（店舗側のキャスト管理から開く） ──
+let castMemoLogCastId = null
+let castMemoLogMonth = ym(new Date())
+function openCastMemoLog(castId, castName){
+  castMemoLogCastId = castId
+  castMemoLogMonth = ym(new Date())
+  document.getElementById('cast-memo-log-title').textContent = castName + ' の接客メモ'
+  document.getElementById('cast-memo-log-overlay').classList.add('on')
+  renderCastMemoLog()
+}
+function castMemoLogMove(d){ castMemoLogMonth=addMonth(castMemoLogMonth,d); renderCastMemoLog() }
+async function renderCastMemoLog(){
+  const [y,m] = castMemoLogMonth.split('-').map(Number)
+  document.getElementById('cast-memo-log-month').textContent = y+'年'+m+'月'
+  const body = document.getElementById('cast-memo-log-body')
+  body.innerHTML = '<div class="spin">読み込み中...</div>'
+  // cast_nameで自分のメモを取得
+  const {data:castInfo} = await sb.from('casts').select('name').eq('id',castMemoLogCastId).single()
+  const name = castInfo?.name||''
+  const {data:memos} = await sb.from('customer_visits')
+    .select('id,cast_memo,customer_id,created_at')
+    .eq('cast_name', name)
+    .not('cast_memo','is',null)
+    .neq('cast_memo','')
+    .gte('created_at', castMemoLogMonth+'-01')
+    .lt('created_at', nextYM(castMemoLogMonth)+'-01')
+    .order('created_at',{ascending:false})
+  if(!memos||!memos.length){body.innerHTML='<div class="empty">この月のメモはありません</div>';return}
+  // 顧客名を取得
+  const custIds=[...new Set(memos.map(x=>x.customer_id).filter(Boolean))]
+  let custMap={}
+  if(custIds.length){
+    const {data:custs}=await sb.from('customers').select('id,name,customer_no').in('id',custIds)
+    if(custs) custs.forEach(c=>{custMap[c.id]={name:c.name,no:c.customer_no}})
+  }
+  body.innerHTML = memos.map(m=>{
+    const ci = custMap[m.customer_id]
+    return `<div class="card" style="margin-bottom:.4rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
+        <div style="font-size:.78rem;font-weight:600">${ci?`No.${ci.no} ${ci.name}`:'顧客不明'}</div>
+        <div style="font-size:.68rem;color:var(--text3)">${m.created_at?.slice(0,10)||''}</div>
+      </div>
+      <div style="font-size:.83rem">${m.cast_memo}</div>
+    </div>`
+  }).join('')
+}
+
+// ── 割引種別設定保存 ──
+async function saveCastDiscTypes(){
+  const castId = document.getElementById('cast-disc-type-title')?.dataset?.castId
+  if(!castId){toast('キャストIDが不明です');return}
+  const rows = document.querySelectorAll('#cast-disc-type-list [data-disc-id]')
+  for(const row of rows){
+    const discId = parseInt(row.dataset.discId)
+    const sel = row.querySelector('select')
+    if(!sel) continue
+    await sb.from('cast_discounts').update({disc_type:sel.value}).eq('id',discId)
+  }
+  toast('保存しました')
+  closeSheet('cast-disc-type')
+}
+
 init()
 </script>
 </body>
