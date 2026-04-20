@@ -513,7 +513,7 @@ tr:last-child td{border-bottom:none}
                 📋 予約登録後に <strong id="rv-next-no" style="color:var(--accent)">No.---</strong> で自動登録されます
               </div>
               <div class="fi-lbl">電話番号（任意）</div>
-              <input class="fi" id="rv-phone" type="tel" placeholder="090-0000-0000">
+              <input class="fi" id="rv-phone" type="tel" placeholder="090-0000-0000" oninput="autoHyphenPhone(this)" maxlength="13">
             </div>
           </div>
           <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様" oninput="autoKatakana(this)" onblur="autoKatakanaBlur(this)"></div>
@@ -1709,6 +1709,28 @@ async function openReservation(shiftId,castName,date){
 }
 
 // ひらがなをカタカナに変換 + 「様」自動付与
+function autoHyphenPhone(input){
+  let v=input.value.replace(/[^0-9]/g,'')
+  if(v.startsWith('0120')||v.startsWith('0800')){
+    // フリーダイヤル 0120-XXX-XXX
+    if(v.length>4) v=v.slice(0,4)+'-'+v.slice(4)
+    if(v.length>8) v=v.slice(0,8)+'-'+v.slice(8,11)
+  } else if(v.startsWith('090')||v.startsWith('080')||v.startsWith('070')||v.startsWith('050')){
+    // 携帯 090-XXXX-XXXX
+    if(v.length>3) v=v.slice(0,3)+'-'+v.slice(3)
+    if(v.length>8) v=v.slice(0,8)+'-'+v.slice(8,12)
+  } else if(v.startsWith('03')||v.startsWith('06')){
+    // 市外局番2桁 03-XXXX-XXXX
+    if(v.length>2) v=v.slice(0,2)+'-'+v.slice(2)
+    if(v.length>7) v=v.slice(0,7)+'-'+v.slice(7,11)
+  } else {
+    // その他 0XX-XXX-XXXX
+    if(v.length>3) v=v.slice(0,3)+'-'+v.slice(3)
+    if(v.length>7) v=v.slice(0,7)+'-'+v.slice(7,11)
+  }
+  input.value=v
+}
+
 function autoKatakana(input){
   if(input._composing) return
   let v=input.value
