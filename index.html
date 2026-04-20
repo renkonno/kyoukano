@@ -3605,6 +3605,7 @@ async function openShiftReservations(shiftId, castName){
           <div style="font-size:.82rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div>
         </div>
       </div>
+      ${cardAmt>0?`<div style="font-size:.72rem;color:#1565c0;background:#e8f4fd;border-radius:6px;padding:.2rem .5rem;margin-top:.15rem">💳 カード手数料（10%）: -${fmt(Math.floor(cardAmt*0.1))}</div>`:''}
       ${r.note?`<div style="font-size:.75rem;color:var(--text3)">📝 ${r.note}</div>`:''}
       <div style="font-size:.7rem;color:var(--text3);text-align:right">タップで詳細・修正 ›</div>
     </div>`
@@ -3716,6 +3717,7 @@ async function openRvDetail(rvId, shiftId, castName){
           <div style="font-size:.95rem;font-weight:800;color:#1565c0">${fmt(cardAmt)}</div>
         </div>
       </div>
+      ${cardAmt>0?`<div style="font-size:.78rem;color:#1565c0;background:#e8f4fd;border-radius:8px;padding:.35rem .7rem;margin-top:-.1rem">💳 カード手数料（10%）: -${fmt(Math.floor(cardAmt*0.1))}</div>`:''}
       <div class="fee-sec">
         <div class="fee-row"><div class="fee-lbl">来店区分</div><div>${r.is_new===true||r.is_new==='true'?'<span style="color:#4CAF50;font-weight:700">新規</span>':'再訪'}</div></div>
         <div class="fee-row"><div class="fee-lbl">顧客番号</div><div>${r.customer_no?'No.'+r.customer_no:'未登録'}</div></div>
