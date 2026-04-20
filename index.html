@@ -2999,7 +2999,7 @@ function getOptPrice(name){
 }
 
 function calcTotal2(){
-  let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0
+  let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0,totalDisc=0
   const blocks=document.querySelectorAll('.session-block')
   const sessionCount=blocks.length
   // 雑費の自動計算
@@ -3011,33 +3011,67 @@ function calcTotal2(){
     else autoMiscAmt=sheetFee.misc_3??2000
     document.getElementById('w-misc').value=autoMiscAmt
   }
-  blocks.forEach(block=>{
+  blocks.forEach((block,bi)=>{
     const cid=parseInt(block.querySelector('.s-course').value)
     const stype=block.querySelector('.s-shimei').value
-    totalBack+=getCourseBack(cid)+getShimeiBack(stype)
-    block.querySelectorAll('.op-check:checked').forEach(cb=>totalBack+=getOptBack2(cb.dataset.name))
+    const cback=getCourseBack(cid)
+    const sback=getShimeiBack(stype)
+    const c=courses.find(x=>x.id===cid)
+    const coursePrice=c?c.price||0:0
+    const shimeiPrice=getShimeiPrice(stype)
+    let optSale=0,optBack=0
+    block.querySelectorAll('.op-check:checked').forEach(cb=>{
+      optSale+=getOptPrice(cb.dataset.name)
+      optBack+=getOptBack2(cb.dataset.name)
+    })
+    let blockDiscBack=0,blockDiscShop=0
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
       const amt=parseInt(cb.dataset.amount)||0
-      if(cb.dataset.dtype==='shop') discFromShop+=amt
-      else discFromBack+=amt
+      if(cb.dataset.dtype==='shop') blockDiscShop+=amt
+      else blockDiscBack+=amt
     })
-    const c=courses.find(x=>x.id===cid)
-    // 総売上 = コース料金 + 指名料（店舗側） + オプション料（店舗側） + 延長料金
-    if(c) totalSales+=c.price||0
-    totalSales+=getShimeiPrice(stype)
-    block.querySelectorAll('.op-check:checked').forEach(cb=>totalSales+=getOptPrice(cb.dataset.name))
-    // 延長チェックボックス集計
     const extCourseCalc=courses.find(c=>c.name&&c.name.includes('延長'))
     const extBackUnit=sheetFee.back_ext30||DEFAULT_FEE.back_ext30
     const extPriceUnit=extCourseCalc?.price||0
+    let extBack=0,extSale=0
     block.querySelectorAll('.ext-check:checked').forEach(()=>{
-      totalBack+=extBackUnit
-      totalSales+=extPriceUnit
+      extBack+=extBackUnit
+      extSale+=extPriceUnit
     })
+    const blockDisc=blockDiscBack+blockDiscShop
+    const blockSales=coursePrice+shimeiPrice+optSale+extSale-blockDisc
+    const blockBack=cback+sback+optBack+extBack-blockDiscBack
+    totalSales+=blockSales
+    totalBack+=blockBack
+    discFromBack+=blockDiscBack
+    discFromShop+=blockDiscShop
+    totalDisc+=blockDisc
+    // セッション内訳をリアルタイム表示
+    let breakdown=block.querySelector('.session-breakdown')
+    if(!breakdown){
+      breakdown=document.createElement('div')
+      breakdown.className='session-breakdown'
+      breakdown.style.cssText='margin-top:.4rem;padding:.4rem .5rem;background:var(--surface2);border-radius:6px;font-size:.75rem'
+      block.appendChild(breakdown)
+    }
+    let brows=''
+    if(c) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--text3)">${c.name}</span><span>${fmt(coursePrice)}</span></div>`
+    if(shimeiPrice) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--text3)">${stype}</span><span>${fmt(shimeiPrice)}</span></div>`
+    block.querySelectorAll('.op-check:checked').forEach(cb=>{
+      const p=getOptPrice(cb.dataset.name)
+      if(p) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--text3)">${cb.dataset.name}</span><span>${fmt(p)}</span></div>`
+    })
+    if(extSale) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--btx)">延長</span><span>${fmt(extSale)}</span></div>`
+    block.querySelectorAll('.disc-check:checked').forEach(cb=>{
+      const amt=parseInt(cb.dataset.amount)||0
+      brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--rtx)">${cb.dataset.name}</span><span style="color:var(--rtx)">-${fmt(amt)}</span></div>`
+    })
+    brows+=`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-top:1px solid var(--border);margin-top:.2rem;font-weight:700"><span>小計</span><span>${fmt(blockSales)}</span></div>`
+    breakdown.innerHTML=brows
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
   const hosho=parseInt(document.getElementById('w-hosho')?.value)||0
-  let net=totalBack-discFromBack-misc
+  let net=totalBack-misc
   // 保証：通常の委託金より保証が高い場合、差額を店が負担
   const hoshoApplied=hosho>0&&net<hosho
   if(hoshoApplied) net=hosho
@@ -3105,12 +3139,14 @@ async function saveWork(){
     })
     const extSaleTotal=extensions.reduce((s,e)=>s+e.price,0)
     const extBackTotal=extensions.reduce((s,e)=>s+e.back,0)
-    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal
+    const sessionDiscTotal=discounts.reduce((s,d)=>s+(d.amount||0),0)
+    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal-sessionDiscTotal
+    const sessionBackDisc=discounts.filter(d=>d.disc_type!=='shop').reduce((s,d)=>s+(d.amount||0),0)
     sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
-    totalSales+=sessionSales;totalBack+=cback+sback+optBack+extBackTotal;totalCount++
+    totalSales+=sessionSales;totalBack+=cback+sback+optBack+extBackTotal-sessionBackDisc;totalCount++
   })
   const hoshoSave=parseInt(document.getElementById('w-hosho')?.value)||0
-  let net=totalBack-discFromBack-misc
+  let net=totalBack-misc
   const hoshoAppliedSave=hoshoSave>0&&net<hoshoSave
   if(hoshoAppliedSave) net=hoshoSave
   const shopDrop=totalSales-net-discFromShop
