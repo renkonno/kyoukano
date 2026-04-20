@@ -507,9 +507,13 @@ tr:last-child td{border-bottom:none}
               </div>
               <div id="rv-cust-warn" style="display:none;font-size:.75rem;color:var(--rtx);margin-top:.3rem;padding:.3rem .5rem;background:var(--rbg);border-radius:6px;border:1px solid var(--rbd)">⚠️ 顧客番号が未登録です。</div>
             </div>
-            <!-- 自動登録ON：次の番号を表示 -->
-            <div id="rv-auto-area" style="display:none;font-size:.82rem;color:var(--text3);padding:.4rem .6rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-              📋 予約登録後に <strong id="rv-next-no" style="color:var(--accent)">No.---</strong> で自動登録されます
+            <!-- 自動登録ON：次の番号を表示＋電話番号入力 -->
+            <div id="rv-auto-area" style="display:none">
+              <div style="font-size:.82rem;color:var(--text3);padding:.4rem .6rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:.5rem">
+                📋 予約登録後に <strong id="rv-next-no" style="color:var(--accent)">No.---</strong> で自動登録されます
+              </div>
+              <div class="fi-lbl">電話番号（任意）</div>
+              <input class="fi" id="rv-phone" type="tel" placeholder="090-0000-0000">
             </div>
           </div>
           <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様" oninput="autoKatakana(this)" onblur="autoKatakanaBlur(this)"></div>
@@ -1664,6 +1668,8 @@ async function openReservation(shiftId,castName,date){
   // 自動登録チェックをリセット
   const autoChk=document.getElementById('rv-auto-register')
   if(autoChk){autoChk.checked=false;toggleAutoRegister(autoChk)}
+  const phoneEl=document.getElementById('rv-phone')
+  if(phoneEl) phoneEl.value=''
   // 顧客番号警告リセット
   const custWarnEl=document.getElementById('rv-cust-warn')
   if(custWarnEl) custWarnEl.style.display='none'
@@ -1864,10 +1870,11 @@ async function saveReservation(){
     custNoInt=nextNo
     // customersテーブルに新規登録
     const custName2=finalName.replace(/様$/, '')
+    const phone2=document.getElementById('rv-phone')?.value.trim()||''
     const{error:custErr}=await sb.from('customers').insert({
       customer_no:nextNo,
       name:custName2,
-      phone:'',
+      phone:phone2,
       memo:''
     })
     if(custErr){toast('顧客登録エラー: '+custErr.message);return}
