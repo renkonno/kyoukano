@@ -1662,7 +1662,9 @@ async function saveCastMemo(){
 }
 
 // ── 予約管理 ──
+let _rvCastName=''
 async function openReservation(shiftId,castName,date){
+  _rvCastName=castName||''
   document.getElementById('rv-shift-id').value=shiftId
   document.getElementById('reservation-title').textContent=`${castName} ${date} 予約登録`
   document.getElementById('rv-cust-id').value=''
@@ -1937,7 +1939,7 @@ async function saveReservation(){
     : allCustomers.find(x=>x.customer_no===parseInt(custNo)||x.id===parseInt(custNo))?.id
   if(custId){
     await sb.from('customer_visits').insert({
-      customer_id:custId,cast_name:'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
+      customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
     })
   }
   toast('予約を登録しました')
