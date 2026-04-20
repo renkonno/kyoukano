@@ -3018,11 +3018,15 @@ function calcTotal2(){
     const sback=getShimeiBack(stype)
     const c=courses.find(x=>x.id===cid)
     const coursePrice=c?c.price||0:0
+    const courseShop=coursePrice-cback  // コースの店落ち分
     const shimeiPrice=getShimeiPrice(stype)
     let optSale=0,optBack=0
+    const optRows=[]
     block.querySelectorAll('.op-check:checked').forEach(cb=>{
-      optSale+=getOptPrice(cb.dataset.name)
-      optBack+=getOptBack2(cb.dataset.name)
+      const p=getOptPrice(cb.dataset.name)
+      const b=getOptBack2(cb.dataset.name)
+      optSale+=p; optBack+=b
+      optRows.push({name:cb.dataset.name,price:p,back:b,shop:p-b})
     })
     let blockDiscBack=0,blockDiscShop=0
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
@@ -3038,14 +3042,14 @@ function calcTotal2(){
       extBack+=extBackUnit
       extSale+=extPriceUnit
     })
-    const blockDisc=blockDiscBack+blockDiscShop
-    const blockSales=coursePrice+shimeiPrice+optSale+extSale-blockDisc
+    // どちらの割引も総売上（客の支払い）は下がる
+    // 店落ちから引く→店が負担（店落ちが減る）、委託金から引く→キャストが負担（委託金が減る）
+    const blockSales=coursePrice+shimeiPrice+optSale+extSale-blockDiscShop-blockDiscBack
     const blockBack=cback+sback+optBack+extBack-blockDiscBack
     totalSales+=blockSales
     totalBack+=blockBack
     discFromBack+=blockDiscBack
     discFromShop+=blockDiscShop
-    totalDisc+=blockDisc
     // セッション内訳をリアルタイム表示
     let breakdown=block.querySelector('.session-breakdown')
     if(!breakdown){
@@ -3054,19 +3058,35 @@ function calcTotal2(){
       breakdown.style.cssText='margin-top:.4rem;padding:.4rem .5rem;background:var(--surface2);border-radius:6px;font-size:.75rem'
       block.appendChild(breakdown)
     }
-    let brows=''
-    if(c) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--text3)">${c.name}</span><span>${fmt(coursePrice)}</span></div>`
-    if(shimeiPrice) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--text3)">${stype}</span><span>${fmt(shimeiPrice)}</span></div>`
-    block.querySelectorAll('.op-check:checked').forEach(cb=>{
-      const p=getOptPrice(cb.dataset.name)
-      if(p) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--text3)">${cb.dataset.name}</span><span>${fmt(p)}</span></div>`
-    })
-    if(extSale) brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--btx)">延長</span><span>${fmt(extSale)}</span></div>`
+    // 内訳：各項目に委託金・店落ちを表示
+    const row=(label,price,back)=>{
+      const shop=price-back
+      let r=`<div style="display:flex;justify-content:space-between;align-items:center;padding:.15rem 0;border-bottom:1px solid var(--border)">`
+      r+=`<span style="color:var(--text3);flex:1">${label}</span>`
+      r+=`<span style="width:60px;text-align:right">${fmt(price)}</span>`
+      r+=`<span style="width:60px;text-align:right;color:var(--accent);font-size:.7rem">委:${fmt(back)}</span>`
+      if(shop>0) r+=`<span style="width:60px;text-align:right;color:var(--text3);font-size:.7rem">店:${fmt(shop)}</span>`
+      r+=`</div>`
+      return r
+    }
+    let brows=`<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;font-size:.65rem;color:var(--text3);padding:.1rem 0;font-weight:600"><span>項目</span><span style="text-align:right">金額</span><span style="text-align:right">委託金</span><span style="text-align:right">店落ち</span></div>`
+    if(c) brows+=row(c.name,coursePrice,cback)
+    if(shimeiPrice) brows+=row(stype,shimeiPrice,sback)
+    optRows.forEach(o=>{ brows+=row(o.name,o.price,o.back) })
+    if(extSale) brows+=row('延長',extSale,extBack)
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
       const amt=parseInt(cb.dataset.amount)||0
-      brows+=`<div style="display:flex;justify-content:space-between;padding:.1rem 0"><span style="color:var(--rtx)">${cb.dataset.name}</span><span style="color:var(--rtx)">-${fmt(amt)}</span></div>`
+      const isShop=cb.dataset.dtype==='shop'
+      brows+=`<div style="display:flex;justify-content:space-between;padding:.15rem 0;border-bottom:1px solid var(--border)">`
+      brows+=`<span style="color:var(--rtx);flex:1">${cb.dataset.name}</span>`
+      brows+=`<span style="width:60px;text-align:right;color:var(--rtx)">-${fmt(amt)}</span>`
+      brows+=`<span style="width:60px;text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'':'-'+fmt(amt)}</span>`
+      brows+=`<span style="width:60px;text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'-'+fmt(amt):''}</span>`
+      brows+=`</div>`
     })
-    brows+=`<div style="display:flex;justify-content:space-between;padding:.2rem 0;border-top:1px solid var(--border);margin-top:.2rem;font-weight:700"><span>小計</span><span>${fmt(blockSales)}</span></div>`
+    const sessionShop=blockSales-blockBack
+    brows+=`<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;padding:.2rem 0;margin-top:.2rem;font-weight:700;font-size:.78rem">`
+    brows+=`<span>小計</span><span style="text-align:right">${fmt(blockSales)}</span><span style="text-align:right;color:var(--accent)">${fmt(blockBack)}</span><span style="text-align:right">${fmt(sessionShop)}</span></div>`
     breakdown.innerHTML=brows
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
@@ -3139,11 +3159,13 @@ async function saveWork(){
     })
     const extSaleTotal=extensions.reduce((s,e)=>s+e.price,0)
     const extBackTotal=extensions.reduce((s,e)=>s+e.back,0)
-    const sessionDiscTotal=discounts.reduce((s,d)=>s+(d.amount||0),0)
-    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal-sessionDiscTotal
-    const sessionBackDisc=discounts.filter(d=>d.disc_type!=='shop').reduce((s,d)=>s+(d.amount||0),0)
+    // 店落ちからの割引→総売上を下げる、委託金からの割引→委託金を下げる
+    const discShop=discounts.filter(d=>d.disc_type==='shop').reduce((s,d)=>s+(d.amount||0),0)
+    const discBack=discounts.filter(d=>d.disc_type!=='shop').reduce((s,d)=>s+(d.amount||0),0)
+    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal-discShop-discBack
+    const sessionBack=cback+sback+optBack+extBackTotal-discBack
     sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
-    totalSales+=sessionSales;totalBack+=cback+sback+optBack+extBackTotal-sessionBackDisc;totalCount++
+    totalSales+=sessionSales;totalBack+=sessionBack;totalCount++
   })
   const hoshoSave=parseInt(document.getElementById('w-hosho')?.value)||0
   let net=totalBack-misc
