@@ -1421,12 +1421,15 @@ function renderCustomers(list){
   let html=''
   list.forEach(c=>{
     const banned=c.is_banned?'<span style="font-size:.65rem;background:#f44336;color:#fff;padding:1px 6px;border-radius:99px;margin-left:.4rem">出禁</span>':''
-    html+=`<div class="item" onclick="openCustomerDetail(${c.id})">
-      <div class="ib">
+    html+=`<div class="item" style="gap:.5rem">
+      <div class="ib" onclick="openCustomerDetail(${c.id})" style="flex:1;cursor:pointer">
         <div class="it">No.${c.customer_no}　${c.name}${banned}</div>
         <div class="is">${c.phone||'電話番号未登録'}</div>
       </div>
-      <div class="ic">›</div>
+      <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0">
+        <div class="ic" onclick="openCustomerDetail(${c.id})" style="cursor:pointer">›</div>
+        <button class="btn btn-red btn-xs" onclick="deleteCustomer(${c.id},this.dataset.n)" data-n="${c.name}" style="font-size:.65rem;padding:3px 7px;white-space:nowrap">削除</button>
+      </div>
     </div>`
   })
   area.innerHTML=html
@@ -1482,7 +1485,9 @@ async function openCustomerDetail(id){
           <div style="font-size:.83rem;font-weight:600">${v.visit_date||''}</div>
           <button class="btn btn-red btn-xs" onclick="deleteVisit(${v.id},${id})" style="font-size:.6rem;padding:2px 6px">削除</button>
         </div>
-        <div style="font-size:.78rem;color:var(--text3)">${v.cast_name||''} / ${v.shimei_type||'フリー'} / ${v.course||''} ${v.options?'/ '+v.options:''}</div>
+        <div style="font-size:.78rem;color:var(--text3)">
+          ${v.cast_name&&v.cast_name!=='予約'?`<span style="color:var(--accent);font-weight:600">${v.cast_name}</span> / `:''}${v.shimei_type||'フリー'} / ${v.course||''} ${v.options?'/ '+v.options:''}
+        </div>
       </div>`
     })
   }
@@ -1550,6 +1555,17 @@ async function saveCustomerEdit(id){
   await loadCustomers()
   const updated=allCustomers.find(x=>x.id===id)
   if(updated)openCustomerDetail(id)
+}
+
+async function deleteCustomer(custId, name){
+  if(!confirm(name+'さんのデータを完全に削除しますか？\n来店記録・メモも全て削除されます。\nこの操作は取り消せません。'))return
+  // 来店記録を削除
+  await sb.from('customer_visits').delete().eq('customer_id',custId)
+  // 顧客本体を削除
+  const{error}=await sb.from('customers').delete().eq('id',custId)
+  if(error){toast('削除エラー: '+error.message);return}
+  toast(name+'さんのデータを削除しました')
+  await loadCustomers()
 }
 
 async function deleteVisit(visitId,custId){
@@ -1891,15 +1907,17 @@ async function saveReservation(){
     const nextNo=((last||[])[0]?.customer_no||0)+1
     custNoInt=nextNo
     // customersテーブルに新規登録
-    const custName2=finalName.replace(/様$/, '')
+    const custName2=finalName.endsWith('様')?finalName:finalName+'様'
     const phone2=document.getElementById('rv-phone')?.value.trim()||''
     const{error:custErr}=await sb.from('customers').insert({
       customer_no:nextNo,
       name:custName2,
       phone:phone2,
-      memo:''
+      memo:'',
+      ng_casts:'',
+      is_banned:false
     })
-    if(custErr){toast('顧客登録エラー: '+custErr.message);return}
+    if(custErr){toast('顧客登録エラー: '+(custErr.message||custErr.code||JSON.stringify(custErr)));return}
     // 登録したレコードのidを取得
     const{data:newCust}=await sb.from('customers').select('id').eq('customer_no',nextNo).single()
     allCustomers.push({id:newCust?.id,customer_no:nextNo,name:custName2})
