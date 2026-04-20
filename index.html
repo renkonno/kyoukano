@@ -262,11 +262,21 @@ tr:last-child td{border-bottom:none}
     <button class="back-btn" onclick="showLogin('top')">‹</button>
     <div class="login-logo" style="font-size:1.3rem;font-family:Georgia,serif;letter-spacing:.18em;font-weight:700;color:#B8893A;margin-bottom:.25rem;text-align:center">KYOUKANO NAGOYA</div>
     <div class="login-sub">セラピストログイン</div>
-    <label class="lbl">名前</label>
-    <select class="linput" id="cast-sel"><option value="">読み込み中...</option></select>
-    <label class="lbl">PIN（4桁）</label>
-    <input class="linput" type="password" id="cast-pin" maxlength="4" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doCastLogin()">
-    <button class="btn-login" style="background:#3a3a3c" onclick="doCastLogin()" id="btn-cast">ログイン</button>
+    <label class="lbl">名前を選んでください</label>
+    <!-- カード選択UI -->
+    <div id="cast-card-list" style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:1rem;max-height:240px;overflow-y:auto;padding-right:2px"></div>
+    <!-- hidden select（doCastLogin互換用） -->
+    <select id="cast-sel" style="display:none"><option value="">読み込み中...</option></select>
+    <!-- PIN（選択後に表示） -->
+    <div id="cast-pin-area" style="display:none">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+        <div id="cast-selected-badge" style="font-size:.82rem;font-weight:700;color:var(--accent);background:rgba(184,137,58,.1);border:1.5px solid var(--accent);border-radius:99px;padding:.25rem .9rem"></div>
+        <button onclick="clearCastSelection()" style="background:none;border:none;font-size:.75rem;color:var(--text3);cursor:pointer;padding:.2rem .4rem">変更</button>
+      </div>
+      <label class="lbl">PIN（4桁）</label>
+      <input class="linput" type="password" id="cast-pin" maxlength="4" inputmode="numeric" placeholder="••••" onkeydown="if(event.key='Enter')doCastLogin()">
+      <button class="btn-login" style="background:linear-gradient(135deg,#b8893a,#d4a855)" onclick="doCastLogin()" id="btn-cast">ログイン</button>
+    </div>
     <div class="lerr" id="cast-err"></div>
   </div>
 </div>
@@ -483,12 +493,24 @@ tr:last-child td{border-bottom:none}
         <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1rem">
           <input type="hidden" id="rv-shift-id">
           <div>
-            <div class="fi-lbl">顧客番号</div>
-            <div style="display:flex;gap:.5rem">
-              <input class="fi" id="rv-cust-id" type="number" placeholder="番号入力" style="flex:1" oninput="autoFillCustomer()">
-              <span id="rv-cust-name" style="display:flex;align-items:center;font-size:.85rem;color:var(--text3);min-width:80px"></span>
+            <!-- 自動登録チェックボックス -->
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.6rem;padding:.5rem .7rem;background:rgba(184,137,58,.08);border:1.5px solid rgba(184,137,58,.3);border-radius:10px">
+              <input type="checkbox" id="rv-auto-register" onchange="toggleAutoRegister(this)" style="width:18px;height:18px;accent-color:var(--accent)">
+              <span style="font-size:.85rem;font-weight:600;color:var(--accent)">✨ 新規顧客を自動登録する</span>
+            </label>
+            <!-- 既存顧客：顧客番号入力（自動登録OFFのとき表示） -->
+            <div id="rv-existing-area">
+              <div class="fi-lbl">顧客番号</div>
+              <div style="display:flex;gap:.5rem">
+                <input class="fi" id="rv-cust-id" type="number" placeholder="番号入力" style="flex:1" oninput="autoFillCustomer()">
+                <span id="rv-cust-name" style="display:flex;align-items:center;font-size:.85rem;color:var(--text3);min-width:80px"></span>
+              </div>
+              <div id="rv-cust-warn" style="display:none;font-size:.75rem;color:var(--rtx);margin-top:.3rem;padding:.3rem .5rem;background:var(--rbg);border-radius:6px;border:1px solid var(--rbd)">⚠️ 顧客番号が未登録です。</div>
             </div>
-            <div id="rv-cust-warn" style="display:none;font-size:.75rem;color:var(--rtx);margin-top:.3rem;padding:.3rem .5rem;background:var(--rbg);border-radius:6px;border:1px solid var(--rbd)">⚠️ 顧客番号が未登録です。予約後に顧客管理から登録してください。</div>
+            <!-- 自動登録ON：次の番号を表示 -->
+            <div id="rv-auto-area" style="display:none;font-size:.82rem;color:var(--text3);padding:.4rem .6rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+              📋 予約登録後に <strong id="rv-next-no" style="color:var(--accent)">No.---</strong> で自動登録されます
+            </div>
           </div>
           <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様" oninput="autoKatakana(this)" onblur="autoKatakanaBlur(this)"></div>
           <div><div class="fi-lbl">来店区分</div>
@@ -891,8 +913,20 @@ function showLogin(type){
 
 async function init(){
   const{data:casts}=await sb.from('casts').select('id,name').eq('active',true).order('sort_order',{ascending:true})
+  // hidden select（互換用）
   const html='<option value="">選んでください</option>'+(casts||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
   document.getElementById('cast-sel').innerHTML=html
+  // カードUI描画
+  const cardList=document.getElementById('cast-card-list')
+  if(cardList){
+    cardList.innerHTML=(casts||[]).map(c=>`
+      <button type="button" onclick="selectCastCard(${c.id},'${c.name.replace(/'/g,"\'")}')"
+        style="background:rgba(255,255,255,0.82);border:1.5px solid var(--border);border-radius:14px;padding:.7rem .5rem;font-size:.88rem;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;letter-spacing:.04em;transition:all .18s;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,.07)"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">
+        ${c.name}
+      </button>`).join('')
+  }
   const{data:cs}=await sb.from('courses').select('*').order('price')
   const{data:op}=await sb.from('options').select('*').order('id')
   const{data:ss}=await sb.from('store_settings').select('*').single()
@@ -927,6 +961,36 @@ async function doOwnerLogin(){
   me={id:0,name:'店舗',is_owner:true}
   sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
   startApp()
+}
+
+function selectCastCard(castId, castName){
+  // hidden selectを更新
+  const sel=document.getElementById('cast-sel')
+  if(sel) sel.value=castId
+  // カード一覧を隠してPIN欄を表示
+  const cardList=document.getElementById('cast-card-list')
+  const pinArea=document.getElementById('cast-pin-area')
+  const badge=document.getElementById('cast-selected-badge')
+  const lbl=document.querySelector('#s-cast-login .lbl')
+  if(cardList) cardList.style.display='none'
+  if(lbl) lbl.style.display='none'
+  if(pinArea) pinArea.style.display='block'
+  if(badge) badge.textContent=castName
+  document.getElementById('cast-pin')?.focus()
+  document.getElementById('cast-err').textContent=''
+}
+
+function clearCastSelection(){
+  const sel=document.getElementById('cast-sel')
+  if(sel) sel.value=''
+  const cardList=document.getElementById('cast-card-list')
+  const pinArea=document.getElementById('cast-pin-area')
+  const lbl=document.querySelector('#s-cast-login .lbl')
+  if(cardList) cardList.style.display='grid'
+  if(lbl) lbl.style.display='block'
+  if(pinArea) pinArea.style.display='none'
+  document.getElementById('cast-pin').value=''
+  document.getElementById('cast-err').textContent=''
 }
 
 async function doCastLogin(){
@@ -1597,6 +1661,9 @@ async function openReservation(shiftId,castName,date){
   if(document.getElementById('rv-pay-course')) document.getElementById('rv-pay-course').value='現金'
   if(document.getElementById('rv-pay-shimei')) document.getElementById('rv-pay-shimei').value='現金'
   document.getElementById('rv-note').value=''
+  // 自動登録チェックをリセット
+  const autoChk=document.getElementById('rv-auto-register')
+  if(autoChk){autoChk.checked=false;toggleAutoRegister(autoChk)}
   // 顧客番号警告リセット
   const custWarnEl=document.getElementById('rv-cust-warn')
   if(custWarnEl) custWarnEl.style.display='none'
@@ -1693,6 +1760,28 @@ function autoCalcCheckout(){
   document.getElementById('rv-checkout').value=`${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
 }
 
+async function toggleAutoRegister(chk){
+  const existingArea=document.getElementById('rv-existing-area')
+  const autoArea=document.getElementById('rv-auto-area')
+  const nameInput=document.getElementById('rv-name')
+  if(chk.checked){
+    if(existingArea) existingArea.style.display='none'
+    if(autoArea) autoArea.style.display='block'
+    // 次の顧客番号を取得
+    const {data:last}=await sb.from('customers').select('customer_no').order('customer_no',{ascending:false}).limit(1)
+    const nextNo=((last||[])[0]?.customer_no||0)+1
+    const el=document.getElementById('rv-next-no')
+    if(el) el.textContent='No.'+nextNo
+    // 自動登録時は名前欄を「新規のお客様」にリセット
+    if(nameInput) nameInput.value=''
+    if(nameInput) nameInput.placeholder='お客様名（例：タナカ様）'
+  } else {
+    if(existingArea) existingArea.style.display='block'
+    if(autoArea) autoArea.style.display='none'
+    if(nameInput) nameInput.placeholder='○○様'
+  }
+}
+
 function autoFillCustomer(){
   const no=parseInt(document.getElementById('rv-cust-id').value)
   const warn=document.getElementById('rv-cust-warn')
@@ -1757,13 +1846,32 @@ async function saveReservation(){
   const memo=document.getElementById('rv-note').value.trim()
   // 名前に「様」を自動付与
   const finalName=custName.endsWith('様')?custName:custName+'様'
-  const custNoInt=custNo?parseInt(custNo)||null:null
-  // 顧客番号未入力の場合は警告（ブロックはしない）
-  const warn=document.getElementById('rv-cust-warn')
-  if(!custNo||!custNoInt){
-    if(warn) warn.style.display='block'
-  } else {
-    if(warn) warn.style.display='none'
+  const autoRegister=document.getElementById('rv-auto-register')?.checked
+  let custNoInt=custNo?parseInt(custNo)||null:null
+  // 顧客番号未入力の場合は警告（自動登録OFFのみ）
+  if(!autoRegister){
+    const warn=document.getElementById('rv-cust-warn')
+    if(!custNo||!custNoInt){
+      if(warn) warn.style.display='block'
+    } else {
+      if(warn) warn.style.display='none'
+    }
+  }
+  // 自動登録の場合：先に顧客番号を確定
+  if(autoRegister){
+    const{data:last}=await sb.from('customers').select('customer_no').order('customer_no',{ascending:false}).limit(1)
+    const nextNo=((last||[])[0]?.customer_no||0)+1
+    custNoInt=nextNo
+    // customersテーブルに新規登録
+    const{data:newCust,error:custErr}=await sb.from('customers').insert({
+      customer_no:nextNo,
+      name:finalName.replace('様',''),
+      phone:'',
+      memo:''
+    }).select('id').single()
+    if(custErr){toast('顧客登録エラー: '+custErr.message);return}
+    allCustomers.push({id:newCust.id,customer_no:nextNo,name:finalName.replace('様','')})
+    toast('No.'+nextNo+' で顧客登録しました！')
   }
   const{error}=await sb.from('reservations').insert({
     shift_id:shiftId,
@@ -1774,13 +1882,13 @@ async function saveReservation(){
   })
   if(error){toast('エラー: '+error.message);return}
   // 顧客の来店記録にも追加
-  if(custNo){
-    const c=allCustomers.find(x=>x.customer_no===parseInt(custNo)||x.id===parseInt(custNo))
-    if(c){
-      await sb.from('customer_visits').insert({
-        customer_id:c.id,cast_name:'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
-      })
-    }
+  const custId=autoRegister
+    ? allCustomers.find(x=>x.customer_no===custNoInt)?.id
+    : allCustomers.find(x=>x.customer_no===parseInt(custNo)||x.id===parseInt(custNo))?.id
+  if(custId){
+    await sb.from('customer_visits').insert({
+      customer_id:custId,cast_name:'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
+    })
   }
   toast('予約を登録しました')
   closeSheet('reservation')
