@@ -2237,7 +2237,7 @@ async function loadOwnerCal(){
   const approvedDates={}; (approved||[]).forEach(s=>{if(!approvedDates[s.date])approvedDates[s.date]=0;approvedDates[s.date]++})
   const days=['月','火','水','木','金','土','日']
   const firstDow2=(first+6)%7
-  const cellSize2='calc((100vw - 0.8rem - 14px) / 7)'
+  const cellSize2='calc((100svh - 280px) / 6)'
   let cal=`<table class="cal-table" style="width:100%;table-layout:fixed"><thead><tr>`
   days.forEach((d,i)=>{
     const color=i===6?'color:var(--rtx)':''
@@ -2261,8 +2261,8 @@ async function loadOwnerCal(){
     const rvCount=reservationByDate[ds]||0
     const statusLabel=totalShifts>0?('出勤'+totalShifts):''
     const rvLabel=rvCount>0?`<span style="font-size:.38rem;line-height:1.1;color:var(--accent)">予約${rvCount}</span>`:''
-    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.4rem;line-height:1.1">${statusLabel}</span>`:''} ${rvLabel}</div>`
-    cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;font-size:.68rem;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
+    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusLabel?`<span style="font-size:.42rem;line-height:1.1">${statusLabel}</span>`:''} ${rvLabel}</div>`
+    cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
     col2++
   }
   while(col2<7&&col2>0){cal+=`<td style="height:${cellSize2}"></td>`;col2++}
