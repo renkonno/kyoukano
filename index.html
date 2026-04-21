@@ -1213,7 +1213,7 @@ function renderCal(){
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'出勤':'却下'):''
-    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.45rem;line-height:1.1">${statusText}</span>`:''}</div>`
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.6rem;line-height:1.2">${statusText}</span>`:''}</div>`
     html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
   }
@@ -2260,8 +2260,8 @@ async function loadOwnerCal(){
     const totalShifts=(pendingDates[ds]||0)+(approvedDates[ds]||0)
     const rvCount=reservationByDate[ds]||0
     const statusLabel=totalShifts>0?('出勤'+totalShifts):''
-    const rvLabel=rvCount>0?`<span style="font-size:.38rem;line-height:1.1;color:var(--accent)">予約${rvCount}</span>`:''
-    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusLabel?`<span style="font-size:.42rem;line-height:1.1">${statusLabel}</span>`:''} ${rvLabel}</div>`
+    const rvLabel=rvCount>0?`<span style="font-size:.6rem;line-height:1.2;color:var(--accent)">予約${rvCount}</span>`:''
+    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusLabel?`<span style="font-size:.6rem;line-height:1.2">${statusLabel}</span>`:''} ${rvLabel}</div>`
     cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
     col2++
   }
