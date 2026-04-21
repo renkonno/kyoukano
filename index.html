@@ -3058,18 +3058,20 @@ function calcTotal2(){
       breakdown.style.cssText='margin-top:.4rem;padding:.4rem .5rem;background:var(--surface2);border-radius:6px;font-size:.75rem'
       block.appendChild(breakdown)
     }
-    // 内訳：各項目に委託金・店落ちを表示
+    // 内訳：全行をgridで統一（項目 / 金額 / 委託金 / 店落ち）
+    const G='display:grid;grid-template-columns:1fr 62px 62px 62px;padding:.15rem 0;border-bottom:1px solid var(--border);align-items:center'
     const row=(label,price,back)=>{
       const shop=price-back
-      let r=`<div style="display:flex;justify-content:space-between;align-items:center;padding:.15rem 0;border-bottom:1px solid var(--border)">`
-      r+=`<span style="color:var(--text3);flex:1">${label}</span>`
-      r+=`<span style="width:60px;text-align:right">${fmt(price)}</span>`
-      r+=`<span style="width:60px;text-align:right;color:var(--accent);font-size:.7rem">委:${fmt(back)}</span>`
-      if(shop>0) r+=`<span style="width:60px;text-align:right;color:var(--text3);font-size:.7rem">店:${fmt(shop)}</span>`
-      r+=`</div>`
-      return r
+      return `<div style="${G}">
+        <span style="color:var(--text3);font-size:.75rem">${label}</span>
+        <span style="text-align:right;font-size:.75rem">${fmt(price)}</span>
+        <span style="text-align:right;font-size:.72rem;color:var(--accent)">${fmt(back)}</span>
+        <span style="text-align:right;font-size:.72rem;color:var(--text3)">${shop>0?fmt(shop):'-'}</span>
+      </div>`
     }
-    let brows=`<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;font-size:.65rem;color:var(--text3);padding:.1rem 0;font-weight:600"><span>項目</span><span style="text-align:right">金額</span><span style="text-align:right">委託金</span><span style="text-align:right">店落ち</span></div>`
+    let brows=`<div style="display:grid;grid-template-columns:1fr 62px 62px 62px;padding:.1rem 0;font-size:.65rem;color:var(--text3);font-weight:600;border-bottom:1.5px solid var(--border)">
+      <span>項目</span><span style="text-align:right">金額</span><span style="text-align:right">委託金</span><span style="text-align:right">店落ち</span>
+    </div>`
     if(c) brows+=row(c.name,coursePrice,cback)
     if(shimeiPrice) brows+=row(stype,shimeiPrice,sback)
     optRows.forEach(o=>{ brows+=row(o.name,o.price,o.back) })
@@ -3077,16 +3079,20 @@ function calcTotal2(){
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
       const amt=parseInt(cb.dataset.amount)||0
       const isShop=cb.dataset.dtype==='shop'
-      brows+=`<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;padding:.15rem 0;border-bottom:1px solid var(--border)">`
-      brows+=`<span style="color:var(--rtx)">${cb.dataset.name}</span>`
-      brows+=`<span style="text-align:right;color:var(--rtx)">-${fmt(amt)}</span>`
-      brows+=`<span style="text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'':'-'+fmt(amt)}</span>`
-      brows+=`<span style="text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'-'+fmt(amt):''}</span>`
-      brows+=`</div>`
+      brows+=`<div style="${G}">
+        <span style="color:var(--rtx);font-size:.75rem">${cb.dataset.name}</span>
+        <span style="text-align:right;font-size:.75rem;color:var(--rtx)">-${fmt(amt)}</span>
+        <span style="text-align:right;font-size:.72rem;color:var(--rtx)">${isShop?'-':'-'+fmt(amt)}</span>
+        <span style="text-align:right;font-size:.72rem;color:var(--rtx)">${isShop?'-'+fmt(amt):'-'}</span>
+      </div>`
     })
     const sessionShop=blockSales-blockBack
-    brows+=`<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;padding:.2rem 0;margin-top:.2rem;font-weight:700;font-size:.78rem">`
-    brows+=`<span>小計</span><span style="text-align:right">${fmt(blockSales)}</span><span style="text-align:right;color:var(--accent)">${fmt(blockBack)}</span><span style="text-align:right">${fmt(sessionShop)}</span></div>`
+    brows+=`<div style="display:grid;grid-template-columns:1fr 62px 62px 62px;padding:.25rem 0;margin-top:.15rem;font-weight:700;font-size:.78rem;border-top:1.5px solid var(--border)">
+      <span>小計</span>
+      <span style="text-align:right">${fmt(blockSales)}</span>
+      <span style="text-align:right;color:var(--accent)">${fmt(blockBack)}</span>
+      <span style="text-align:right">${fmt(sessionShop)}</span>
+    </div>`
     breakdown.innerHTML=brows
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
