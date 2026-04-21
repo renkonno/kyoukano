@@ -383,15 +383,16 @@ tr:last-child td{border-bottom:none}
         <div class="cal-title" id="owner-sal-title">-</div>
         <button class="cal-nav-btn" onclick="ownerSalMove(1)">›</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.5rem">
-        <div class="kpi"><div class="kpi-l">総売上高</div><div class="kpi-v" id="o-gross" style="font-size:.85rem">-</div></div>
-        <div class="kpi"><div class="kpi-l">割引</div><div class="kpi-v" id="o-disc" style="font-size:.85rem;color:var(--rtx)">-</div></div>
-        <div class="kpi"><div class="kpi-l">純売上高</div><div class="kpi-v" id="o-sales" style="font-size:.85rem">-</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.4rem">
+        <div class="kpi"><div class="kpi-l">総売上高</div><div class="kpi-v" id="o-gross" style="font-size:.82rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">割引</div><div class="kpi-v" id="o-disc" style="font-size:.82rem;color:var(--rtx)">-</div></div>
+        <div class="kpi"><div class="kpi-l">純売上高</div><div class="kpi-v" id="o-sales" style="font-size:.82rem">-</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
-        <div class="kpi"><div class="kpi-l">委託金</div><div class="kpi-v" id="o-back" style="font-size:.85rem">-</div></div>
-        <div class="kpi"><div class="kpi-l">雑費</div><div class="kpi-v" id="o-cash" style="font-size:.85rem">-</div></div>
-        <div class="kpi"><div class="kpi-l">粗利益</div><div class="kpi-v" id="o-card" style="font-size:.85rem">-</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
+        <div class="kpi"><div class="kpi-l">委託金</div><div class="kpi-v" id="o-back" style="font-size:.82rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">雑費</div><div class="kpi-v" id="o-cash" style="font-size:.82rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">粗利益</div><div class="kpi-v" id="o-card" style="font-size:.82rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">施術件数</div><div class="kpi-v" id="o-count" style="font-size:.82rem">-</div></div>
       </div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
     </div>
@@ -1178,7 +1179,7 @@ function renderCal(){
   const sm={}; myShifts.forEach(s=>sm[s.date]=s)
   const days=['月','火','水','木','金','土','日']
   const firstDow=(first+6)%7
-  const cellSize='calc((100vw - 0.8rem - 14px) / 7 * 0.82)'
+  const cellSize='calc((100svh - 280px) / 6)'  // 1画面に収まる高さ基準
   // テーブル方式で描画（間隔問題を根本解決）
   let html=`<table class="cal-table" style="width:100%;table-layout:fixed"><thead><tr>`
   days.forEach((d,i)=>{
