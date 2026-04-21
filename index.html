@@ -3077,11 +3077,11 @@ function calcTotal2(){
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
       const amt=parseInt(cb.dataset.amount)||0
       const isShop=cb.dataset.dtype==='shop'
-      brows+=`<div style="display:flex;justify-content:space-between;padding:.15rem 0;border-bottom:1px solid var(--border)">`
-      brows+=`<span style="color:var(--rtx);flex:1">${cb.dataset.name}</span>`
-      brows+=`<span style="width:60px;text-align:right;color:var(--rtx)">-${fmt(amt)}</span>`
-      brows+=`<span style="width:60px;text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'':'-'+fmt(amt)}</span>`
-      brows+=`<span style="width:60px;text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'-'+fmt(amt):''}</span>`
+      brows+=`<div style="display:grid;grid-template-columns:1fr 60px 60px 60px;padding:.15rem 0;border-bottom:1px solid var(--border)">`
+      brows+=`<span style="color:var(--rtx)">${cb.dataset.name}</span>`
+      brows+=`<span style="text-align:right;color:var(--rtx)">-${fmt(amt)}</span>`
+      brows+=`<span style="text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'':'-'+fmt(amt)}</span>`
+      brows+=`<span style="text-align:right;font-size:.7rem;color:var(--rtx)">${isShop?'-'+fmt(amt):''}</span>`
       brows+=`</div>`
     })
     const sessionShop=blockSales-blockBack
