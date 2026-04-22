@@ -3558,10 +3558,21 @@ async function importCustomers(){
   const batchSize=50
   for(let i=0;i<IMPORT_DATA.length;i+=batchSize){
     const batch=IMPORT_DATA.slice(i,i+batchSize)
-    const {error}=await sb.from('customers').upsert(batch,{onConflict:'customer_no'})
-    if(error){ ng+=batch.length; console.error(error) }
-    else ok+=batch.length
-    btn.textContent=`インポート中... ${i+batch.length}/${IMPORT_DATA.length}`
+    // customer_noで既存レコードを検索してupdate、なければinsert
+    for(const row of batch){
+      const {data:exist}=await sb.from('customers').select('id').eq('customer_no',row.customer_no).maybeSingle()
+      let error
+      if(exist){
+        const r=await sb.from('customers').update({name:row.name,phone:row.phone}).eq('id',exist.id)
+        error=r.error
+      } else {
+        const r=await sb.from('customers').insert({customer_no:row.customer_no,name:row.name,phone:row.phone})
+        error=r.error
+      }
+      if(error){ ng++; console.error(error) }
+      else ok++
+    }
+    btn.textContent=`インポート中... ${Math.min(i+batchSize,IMPORT_DATA.length)}/${IMPORT_DATA.length}`
   }
   btn.textContent=`完了！ 成功:${ok}件 失敗:${ng}件`
   toast(`インポート完了！ 成功${ok}件`)
