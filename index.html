@@ -445,7 +445,6 @@ tr:last-child td{border-bottom:none}
         <div style="display:flex;gap:.35rem">
           <button class="btn btn-red btn-xs" onclick="openInactiveSheet()">退店済み</button>
           <button class="btn btn-blue btn-xs" onclick="openStoreSettings()">⚙️ 料金設定</button>
-          <button class="btn btn-gray btn-xs" onclick="openOwnerPinChange()">🔑 PIN変更</button>
           <button class="btn btn-gold btn-xs" onclick="openAddCast()">＋ 追加</button>
         </div>
       </div>
@@ -654,7 +653,7 @@ tr:last-child td{border-bottom:none}
     <button class="sh-close" onclick="closeSheet('cast')">✕</button>
     <div class="sh-title">キャストを追加</div>
     <div class="fg"><label>名前</label><input type="text" class="fi2" id="new-name" placeholder="例：さくら"></div>
-    <div class="fg"><label>PIN（4桁）</label><input type="password" class="fi2" id="new-pin" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+    <div class="fg"><label>PIN（最大8桁）</label><input type="password" class="fi2" id="new-pin" maxlength="8" inputmode="numeric" placeholder="••••••••"></div>
     <div style="font-size:.76rem;color:var(--text3);background:var(--surface2);border-radius:var(--rs);padding:.65rem .85rem;margin-bottom:.75rem;line-height:1.6">バック設定は追加後に「バック設定」から変更できます</div>
     <button class="btn btn-gold btn-full" onclick="addCast()">追加する</button>
     <div class="lerr" id="cast-add-err"></div>
@@ -796,6 +795,24 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②</div><input type="number" class="fee-input" id="st-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveStoreSettings()" id="btn-save-store">保存する</button>
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem">
+      <div class="fee-sec-title">🔑 店舗PINを変更</div>
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.5rem">ログイン用PIN（1〜8桁の数字）</div>
+      <div class="fee-row" style="margin-bottom:.4rem">
+        <div class="fee-lbl">現在のPIN</div>
+        <input type="password" id="st-pin-current" class="fee-input" maxlength="8" inputmode="numeric" placeholder="現在のPIN" style="width:110px">
+      </div>
+      <div class="fee-row" style="margin-bottom:.4rem">
+        <div class="fee-lbl">新しいPIN</div>
+        <input type="password" id="st-pin-new1" class="fee-input" maxlength="8" inputmode="numeric" placeholder="新しいPIN" style="width:110px">
+      </div>
+      <div class="fee-row" style="margin-bottom:.4rem">
+        <div class="fee-lbl">確認</div>
+        <input type="password" id="st-pin-new2" class="fee-input" maxlength="8" inputmode="numeric" placeholder="もう一度" style="width:110px">
+      </div>
+      <div id="st-pin-err" style="color:#c62828;font-size:.78rem;margin-bottom:.4rem"></div>
+      <button class="btn btn-gray btn-full" onclick="saveOwnerPinFromStore()" style="margin-bottom:.75rem">🔑 PINを変更する</button>
+    </div>
     <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem">
       <div class="fee-sec-title">🏷️ 店舗共通割引設定</div>
       <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">全キャスト共通の割引を登録。各セラピストの委託金設定で「店落ち/委託金」を選択できます。</div>
@@ -999,9 +1016,9 @@ async function doOwnerLogin(){
   const pin=document.getElementById('owner-pin').value
   const err=document.getElementById('owner-err')
   err.textContent=''
-  const currentPin2=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN
+  const _curPin=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN_DEFAULT
   if(pin.length<1||pin.length>8){err.textContent='PINは1〜8桁で入力してください';return}
-  if(pin!==currentPin2){err.textContent='PINが正しくありません';return}
+  if(pin!==_curPin){err.textContent='PINが正しくありません';return}
   const btn=document.getElementById('btn-owner')
   btn.disabled=true; btn.textContent='確認中...'
   btn.disabled=false; btn.textContent='ログイン'
@@ -1046,7 +1063,7 @@ async function doCastLogin(){
   const err=document.getElementById('cast-err')
   err.textContent=''
   if(!cid){err.textContent='名前を選んでください';return}
-  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  if(pin.length<1||pin.length>8||!/^\d+$/.test(pin)){err.textContent='PINは1〜8桁の数字で入力してください';return}
   const btn=document.getElementById('btn-cast')
   btn.disabled=true; btn.textContent='確認中...'
   const{data:c,error}=await sb.from('casts').select('*').eq('id',cid).eq('pin',pin).single()
@@ -3328,7 +3345,7 @@ async function addCast(){
   const pin=document.getElementById('new-pin').value.trim()
   const err=document.getElementById('cast-add-err')
   if(!name){err.textContent='名前を入力してください';return}
-  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  if(pin.length<1||pin.length>8||!/^\d+$/.test(pin)){err.textContent='PINは1〜8桁の数字で入力してください';return}
   const{data:maxData}=await sb.from('casts').select('sort_order').order('sort_order',{ascending:false}).limit(1)
   const nextOrder=((maxData||[])[0]?.sort_order||0)+1
   const{error}=await sb.from('casts').insert({name,pin,sort_order:nextOrder,active:true})
@@ -3344,7 +3361,6 @@ async function addCast(){
 }
 
 async function changePIN(castId,name){
-  // 現在のPINを取得して表示
   const{data:castData}=await sb.from('casts').select('pin').eq('id',castId).single()
   const currentPin=castData?.pin||'（未設定）'
   document.getElementById('cpd-title').textContent=name+' のPIN管理'
@@ -3362,7 +3378,7 @@ async function saveCastPinDetail(){
   const confirmPin=document.getElementById('cpd-confirm').value.trim()
   const err=document.getElementById('cpd-err')
   err.textContent=''
-  if(newPin.length!==4||isNaN(newPin)){err.textContent='PINは4桁の数字で入力してください';return}
+  if(newPin.length<1||newPin.length>8||!/^\d+$/.test(newPin)){err.textContent='PINは1〜8桁の数字で入力してください';return}
   if(newPin!==confirmPin){err.textContent='確認PINが一致しません';return}
   const{error}=await sb.from('casts').update({pin:newPin}).eq('id',castId)
   if(error){err.textContent='エラーが発生しました';return}
@@ -4096,8 +4112,7 @@ async function openRvEdit(rvId){
           </select>
         </div>
       </div>`:''}
-      <div>
-        <div class="fi-lbl" style="color:var(--blue)">延長</div>
+      <div><div class="fi-lbl" style="color:var(--blue)">延長</div>
         <div id="rve-ext-area">${buildExtRows(pj)}</div>
         <button class="btn btn-gray" style="width:100%;font-size:.82rem;margin-top:.3rem" onclick="rveAddExt()">＋ 延長を追加</button>
       </div>
@@ -4285,6 +4300,56 @@ async function saveCastDiscTypes(){
   closeSheet('cast-disc-type')
 }
 
+// ── 店舗PIN変更（料金設定内から） ──
+function saveOwnerPinFromStore(){
+  const current=document.getElementById('st-pin-current').value
+  const new1=document.getElementById('st-pin-new1').value
+  const new2=document.getElementById('st-pin-new2').value
+  const err=document.getElementById('st-pin-err')
+  err.textContent=''
+  const storedPin=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN_DEFAULT
+  if(current!==storedPin){err.textContent='現在のPINが正しくありません';return}
+  if(new1.length<1||new1.length>8||!/^\d+$/.test(new1)){err.textContent='新しいPINは1〜8桁の数字で入力してください';return}
+  if(new1!==new2){err.textContent='新しいPINが一致しません';return}
+  localStorage.setItem('kyoukano_owner_pin',new1)
+  document.getElementById('st-pin-current').value=''
+  document.getElementById('st-pin-new1').value=''
+  document.getElementById('st-pin-new2').value=''
+  toast('店舗PINを変更しました。次回ログインから有効です。')
+}
+
+// ── 延長行HTML生成（テンプレートリテラルネスト回避） ──
+function buildExtRows(pj){
+  const extCount=pj.extCount||pj.ext_count||0
+  const extPays=pj.extPay||[]
+  let rows=''
+  for(let i=0;i<extCount;i++){
+    const pay=extPays[i]||'現金'
+    rows+='<div class="rve-ext-row" style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem">'
+    rows+='<span style="color:var(--blue);min-width:60px">延長'+(i+1)+'回目</span>'
+    rows+='<select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">'
+    rows+='<option value="現金" '+(pay==='現金'?'selected':'')+'>💴現金</option>'
+    rows+='<option value="カード" '+(pay==='カード'?'selected':'')+'>💳カード</option>'
+    rows+='</select>'
+    rows+='<button onclick="this.closest(\'[class*=rve-ext-row]\')?.remove()||this.parentElement.remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>'
+    rows+='</div>'
+  }
+  return rows
+}
+
+function rveAddExt(){
+  const area=document.getElementById('rve-ext-area'); if(!area) return
+  const idx=area.querySelectorAll('[class*=rve-ext]').length+1
+  const div=document.createElement('div')
+  div.setAttribute('data-ext-row','1')
+  div.style.cssText='display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem'
+  div.innerHTML='<span style="color:var(--blue);min-width:60px">延長'+idx+'回目</span>'
+    +'<select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">'
+    +'<option value="現金">💴現金</option><option value="カード">💳カード</option></select>'
+    +'<button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>'
+  area.appendChild(div)
+}
+
 // =============================================
 // ── 月次売上管理 ──
 // =============================================
@@ -4388,8 +4453,7 @@ async function renderMonthlyContent(){
     })
     const cardFee=Math.floor(card*0.1)
     const profit=gross_work-net-misc
-    const attendance=dayWorks.length
-    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
+    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
   }
 
   const vr=dailyRows.filter(r=>!r.noData)
@@ -4429,7 +4493,6 @@ function renderMonthlyFromCache(){
 function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   const pct=(a,b)=>b>0?Math.round(a/b*100)+'%':'-'
   const pctColor=(a,b)=>a>=b?'color:#4caf50':'color:var(--accent)'
-  const goal_sales=sd.goal_sales,goal_count=sd.goal_count
   let html=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.65rem">`
   ;[['総売上高',fmt2(tot.gross)],['純売上高',fmt2(tot.gross_work)],['割引計',tot.disc>0?'-¥'+tot.disc.toLocaleString():'¥0'],
     ['委託金',fmt2(tot.net)],['雑費',tot.misc>0?'-¥'+tot.misc.toLocaleString():'¥0'],['粗利益',fmt2(tot.profit)],
@@ -4437,6 +4500,7 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
     ['出勤延べ',tot.attendance+'名'],['施術件数',tot.count+'本'],['平均客単価',fmt2(tot.avg_unit)],
   ].forEach(([l,v])=>{ html+=`<div class="kpi"><div class="kpi-l" style="font-size:.6rem">${l}</div><div class="kpi-v" style="font-size:.75rem">${v}</div></div>` })
   html+='</div>'
+  const goal_sales=sd.goal_sales,goal_count=sd.goal_count
   html+=`<div class="card" style="margin-bottom:.55rem">
     <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">🎯 月間目標</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;font-size:.8rem">
@@ -4456,8 +4520,7 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
     </div></div>`
   const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
   const routes=sd.acquisition_routes||{}
-  const hasRoutes=routeItems.some(([,k])=>routes[k]!=null&&routes[k]>0)
-  if(hasRoutes){
+  if(routeItems.some(([,k])=>routes[k]>0)){
     html+=`<div class="card" style="margin-bottom:.55rem">
       <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">📣 集客経路</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;font-size:.8rem">
@@ -4476,64 +4539,37 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   area.innerHTML=html
 }
 
-// ── 日別テーブル：横スクロール1テーブル（スマホ対応・全列表示） ──
 function renderMonthlyDaily(area,dailyRows,tot){
   const N=n=>(n||0).toLocaleString()
-  // カラム定義：幅を詰めてスマホでも全列表示できるように
   const cols=[
     {l:'日付',w:'46px',align:'left',sticky:true},
     {l:'総売上',w:'58px'},{l:'純売上',w:'58px'},{l:'割引',w:'44px'},
     {l:'委託',w:'52px'},{l:'粗利',w:'52px'},{l:'現金',w:'52px'},
     {l:'カード',w:'52px',color:'#1565c0'},{l:'件',w:'26px'},
-    {l:'F',w:'24px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
+    {l:'F',w:'22px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
   ]
-
   const thStyle=(c,i)=>`padding:.28rem ${i===0?.28:.18}rem;text-align:${c.align||'right'};font-size:.62rem;white-space:nowrap;background:var(--surface2);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
   const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thStyle(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
-
+  const stickyTd=`padding:.22rem .28rem;position:sticky;left:0;background:var(--surface);font-size:.65rem;font-weight:600;white-space:nowrap;z-index:1`
+  const td=(v,color='',bold=false)=>`<td style="text-align:right;padding:.22rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}">${v}</td>`
   const makeRow=r=>{
-    const sticky=`padding:.22rem .28rem;position:sticky;left:0;background:var(--surface);font-size:.65rem;font-weight:600;white-space:nowrap;z-index:1`
-    if(r.noData){
-      return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
-        <td style="${sticky}">${r.day}(${r.dow})</td>
-        <td colspan="11" style="text-align:right;padding:.22rem .18rem;font-size:.6rem">—</td></tr>`
-    }
-    const td=(v,color='',bold=false)=>`<td style="text-align:right;padding:.22rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}">${v}</td>`
+    if(r.noData) return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
+      <td style="${stickyTd}">${r.day}(${r.dow})</td><td colspan="11" style="text-align:right;padding:.22rem .18rem;font-size:.6rem">—</td></tr>`
     return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="${sticky}">${r.day}(${r.dow})</td>
+      <td style="${stickyTd}">${r.day}(${r.dow})</td>
       ${td(N(r.gross))}${td(N(r.gross_work))}${td(r.disc>0?N(r.disc):'0','#c62828')}
       ${td(N(r.net))}${td(N(r.profit),'',true)}${td(N(r.cash))}
-      ${td(N(r.card),'#1565c0')}${td(r.count||0)}
-      ${td(r.free||0)}${td(r.net_shimei||0)}${td(r.hon_shimei||0)}
+      ${td(N(r.card),'#1565c0')}${td(r.count||0)}${td(r.free||0)}${td(r.net_shimei||0)}${td(r.hon_shimei||0)}
     </tr>`
   }
-
   const totRow=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.65rem">
-    <td style="padding:.28rem .28rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-    <td style="text-align:right;padding:.28rem .18rem">${N(tot.gross)}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${N(tot.gross_work)}</td>
-    <td style="text-align:right;padding:.28rem .18rem;color:#c62828">${tot.disc>0?N(tot.disc):'0'}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${N(tot.net)}</td>
-    <td style="text-align:right;padding:.28rem .18rem;font-weight:700">${N(tot.profit)}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${N(tot.cash)}</td>
-    <td style="text-align:right;padding:.28rem .18rem;color:#1565c0">${N(tot.card)}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${tot.count}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${tot.free}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${tot.net_shimei}</td>
-    <td style="text-align:right;padding:.28rem .18rem">${tot.hon_shimei}</td>
+    <td style="padding:.28rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
+    ${[N(tot.gross),N(tot.gross_work),(tot.disc>0?N(tot.disc):'0'),N(tot.net),N(tot.profit),N(tot.cash),N(tot.card),tot.count,tot.free,tot.net_shimei,tot.hon_shimei]
+      .map((v,i)=>`<td style="text-align:right;padding:.28rem .18rem${i===4?';font-weight:700':''}${i===6?';color:#1565c0':''}${i===2?';color:#c62828':''}">${v}</td>`).join('')}
   </tr>`
-
-  // 凡例
-  const legend=`<div style="display:flex;gap:.8rem;font-size:.62rem;color:var(--text3);margin-bottom:.3rem;flex-wrap:wrap">
-    <span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>委=委託金</span>
-  </div>`
-
+  const legend=`<div style="display:flex;gap:.8rem;font-size:.62rem;color:var(--text3);margin-bottom:.3rem;flex-wrap:wrap"><span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>委=委託金</span></div>`
   area.innerHTML=legend+`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;min-width:480px">
-      ${thead}
-      <tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody>
-    </table>
-  </div>`
+    <table style="width:100%;border-collapse:collapse;min-width:480px">${thead}<tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody></table></div>`
 }
 
 function renderMonthlyExpense(area,sd,fmt2,total_ad,total_rent,total_util,total_fixed,total_vari,total_custom,total_expenses,customExpenses){
@@ -4542,40 +4578,24 @@ function renderMonthlyExpense(area,sd,fmt2,total_ad,total_rent,total_util,total_
   const row=(l,v)=>v!=null?`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.18rem 0;border-bottom:1px solid var(--border)"><span>${l}</span><span>${fmt2(v)}</span></div>`:''
   const totRow=(l,v)=>`<div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.28rem 0;margin-top:.15rem"><span>${l}</span><span>${fmt2(v)}</span></div>`
   let html=''
-  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📢 宣伝広告費</div>
-    ${row('アロマパンダ',ad.aroma_panda)}${row('エステラブ',ad.esute_love)}${row('ランキング',ad.ranking)}
-    ${row('爆サイ',ad.bakusai)}${row('ジャパン',ad.japan)}${row('エステ魂',ad.esute_kon)}${row('消費税',ad.tax)}
-    ${totRow('小計',total_ad)}</div>`
-  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">🏠 家賃</div>
-    ${row('エスレジデンス',rent.es_residence)}${row('アンナマリー',rent.anna_marie)}${row('ハニリリカ',rent.hani_lilika)}${row('パークフラッツ',rent.park_flats)}
-    ${totRow('小計',total_rent)}</div>`
-  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">💡 水道光熱費</div>
-    ${row('エスレジデンス',util.es_residence)}${row('アンナマリー',util.anna_marie)}${row('ハニリリカ',util.hani_lilika)}${row('パークフラッツ',util.park_flats)}
-    ${totRow('小計',total_util)}</div>`
-  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📋 その他固定費</div>
-    ${row('人件費',fixed.personnel)}${row('通信費',fixed.communication)}${row('カード決済',fixed.card_fee)}
-    ${totRow('固定費合計',total_fixed)}</div>`
-  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📦 変動費</div>
-    ${row('燃料費',vari.fuel)}${row('消耗品',vari.consumables)}${row('備品費',vari.equipment)}${row('会議費',vari.meeting)}${row('その他',vari.other)}
-    ${totRow('変動費合計',total_vari)}</div>`
-  if(customExpenses.length){
-    html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">➕ 追加経費</div>
-      ${customExpenses.map(e=>row(`[${e.category||'その他'}] ${e.label}`,e.amount)).join('')}
-      ${totRow('小計',total_custom)}</div>`
-  }
-  html+=`<div class="card" style="margin-bottom:.5rem;background:var(--surface2)">
-    <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700"><span>💸 経費合計</span><span style="color:var(--accent)">${fmt2(total_expenses)}</span></div></div>`
+  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📢 宣伝広告費</div>${row('アロマパンダ',ad.aroma_panda)}${row('エステラブ',ad.esute_love)}${row('ランキング',ad.ranking)}${row('爆サイ',ad.bakusai)}${row('ジャパン',ad.japan)}${row('エステ魂',ad.esute_kon)}${row('消費税',ad.tax)}${totRow('小計',total_ad)}</div>`
+  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">🏠 家賃</div>${row('エスレジデンス',rent.es_residence)}${row('アンナマリー',rent.anna_marie)}${row('ハニリリカ',rent.hani_lilika)}${row('パークフラッツ',rent.park_flats)}${totRow('小計',total_rent)}</div>`
+  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">💡 水道光熱費</div>${row('エスレジデンス',util.es_residence)}${row('アンナマリー',util.anna_marie)}${row('ハニリリカ',util.hani_lilika)}${row('パークフラッツ',util.park_flats)}${totRow('小計',total_util)}</div>`
+  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📋 その他固定費</div>${row('人件費',fixed.personnel)}${row('通信費',fixed.communication)}${row('カード決済',fixed.card_fee)}${totRow('固定費合計',total_fixed)}</div>`
+  html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📦 変動費</div>${row('燃料費',vari.fuel)}${row('消耗品',vari.consumables)}${row('備品費',vari.equipment)}${row('会議費',vari.meeting)}${row('その他',vari.other)}${totRow('変動費合計',total_vari)}</div>`
+  if(customExpenses.length){ html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">➕ 追加経費</div>${customExpenses.map(e=>row('['+e.category+'] '+e.label,e.amount)).join('')}${totRow('小計',total_custom)}</div>` }
+  html+=`<div class="card" style="margin-bottom:.5rem;background:var(--surface2)"><div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700"><span>💸 経費合計</span><span style="color:var(--accent)">${fmt2(total_expenses)}</span></div></div>`
   html+=`<button class="btn btn-gold" style="width:100%;margin-bottom:1rem" onclick="openMonthlySalesEdit()">✏️ 経費を編集する</button>`
   area.innerHTML=html
 }
 
 function drawPieChart(canvasId,data,colors){
   const canvas=document.getElementById(canvasId); if(!canvas) return
-  const ctx=canvas.getContext('2d')
-  const W=canvas.width,H=canvas.height; ctx.clearRect(0,0,W,H)
+  const ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height
+  ctx.clearRect(0,0,W,H)
   const cx=W/2,cy=H/2,r=Math.min(cx,cy)-2
   const total=data.reduce((s,d)=>s+(d.value||0),0)
-  if(!total){ ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();return }
+  if(!total){ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();return}
   let start=-Math.PI/2
   data.forEach((d,i)=>{
     const sweep=(d.value/total)*Math.PI*2
@@ -4585,18 +4605,15 @@ function drawPieChart(canvasId,data,colors){
     const pct=Math.round(d.value/total*100)
     if(pct>=5){
       const mid=start+sweep/2
-      const lx=cx+Math.cos(mid)*(r*0.65),ly=cy+Math.sin(mid)*(r*0.65)
       ctx.fillStyle='#fff';ctx.font='bold 11px serif';ctx.textAlign='center';ctx.textBaseline='middle'
-      ctx.fillText(pct+'%',lx,ly)
+      ctx.fillText(pct+'%',cx+Math.cos(mid)*(r*0.65),cy+Math.sin(mid)*(r*0.65))
     }
     start+=sweep
   })
 }
 
 function monthlyLegend(data,colors){
-  return data.map((d,i)=>`<div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem">
-    <div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div>
-    <span>${d.label}：${d.value}</span></div>`).join('')
+  return data.map((d,i)=>`<div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem"><div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div><span>${d.label}：${d.value}</span></div>`).join('')
 }
 
 function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total_util,total_fixed,total_vari){
@@ -4610,16 +4627,8 @@ function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total
   const newV=sd.new_customers!=null?sd.new_customers:tot.newCount
   const repV=sd.repeat_customers!=null?sd.repeat_customers:tot.repeatCount
   const visitData=[{label:'新規',value:newV},{label:'再来',value:repV}].filter(d=>d.value>0)
-  const pie=(id,data,colors,label)=>`<div class="card" style="margin-bottom:.55rem">
-    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">${label}</div>
-    ${data.length
-      ?`<div style="display:flex;justify-content:center;margin-bottom:.4rem"><canvas id="${id}" width="180" height="180"></canvas></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.2rem">${monthlyLegend(data,colors)}</div>`
-      :'<div style="color:var(--text3);font-size:.8rem">データなし</div>'}
-  </div>`
-  area.innerHTML=pie('chart-route',routeData,routeColors,'📣 集客経路')+
-    pie('chart-shimei',shimeiData,shimeiColors,'👆 指名内訳')+
-    pie('chart-visit',visitData,visitColors,'👥 来店分類（新規／再来）')
+  const pie=(id,data,colors,label)=>`<div class="card" style="margin-bottom:.55rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">${label}</div>${data.length?`<div style="display:flex;justify-content:center;margin-bottom:.4rem"><canvas id="${id}" width="180" height="180"></canvas></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:.2rem">${monthlyLegend(data,colors)}</div>`:'<div style="color:var(--text3);font-size:.8rem">データなし</div>'}</div>`
+  area.innerHTML=pie('chart-route',routeData,routeColors,'📣 集客経路')+pie('chart-shimei',shimeiData,shimeiColors,'👆 指名内訳')+pie('chart-visit',visitData,visitColors,'👥 来店分類（新規／再来）')
   requestAnimationFrame(()=>{
     if(routeData.length) drawPieChart('chart-route',routeData,routeColors)
     if(shimeiData.length) drawPieChart('chart-shimei',shimeiData,shimeiColors)
@@ -4642,19 +4651,15 @@ async function loadMonthlySalesForm(){
   const customExpenses=data?.custom_expenses||[]
   const setvN=(id,v)=>{const el=document.getElementById(id);if(el&&v!=null)el.value=Number(v).toLocaleString()}
   const setvR=(id,v)=>{const el=document.getElementById(id);if(el&&v!=null)el.value=v}
-  setvN('mse-goal-sales',data?.goal_sales);setvR('mse-goal-count',data?.goal_count);setvR('mse-goal-recruit',data?.goal_recruit)
-  setvR('mse-actual-recruit',data?.actual_recruit)
+  setvN('mse-goal-sales',data?.goal_sales);setvR('mse-goal-count',data?.goal_count);setvR('mse-goal-recruit',data?.goal_recruit);setvR('mse-actual-recruit',data?.actual_recruit)
   setvN('mse-next-goal-sales',data?.next_goal_sales);setvR('mse-next-goal-count',data?.next_goal_count);setvR('mse-next-goal-recruit',data?.next_goal_recruit)
   setvN('mse-ad-panda',ad.aroma_panda);setvN('mse-ad-estelove',ad.esute_love);setvN('mse-ad-ranking',ad.ranking)
   setvN('mse-ad-bakusai',ad.bakusai);setvN('mse-ad-japan',ad.japan);setvN('mse-ad-estekon',ad.esute_kon);setvN('mse-ad-tax',ad.tax)
   setvN('mse-rent-es',rent.es_residence);setvN('mse-rent-anna',rent.anna_marie);setvN('mse-rent-hani',rent.hani_lilika);setvN('mse-rent-park',rent.park_flats)
   setvN('mse-util-es',util.es_residence);setvN('mse-util-anna',util.anna_marie);setvN('mse-util-hani',util.hani_lilika);setvN('mse-util-park',util.park_flats)
   setvN('mse-fixed-personnel',fixed.personnel);setvN('mse-fixed-comm',fixed.communication);setvN('mse-fixed-card',fixed.card_fee)
-  setvN('mse-var-fuel',vari.fuel);setvN('mse-var-consumables',vari.consumables);setvN('mse-var-equipment',vari.equipment)
-  setvN('mse-var-meeting',vari.meeting);setvN('mse-var-other',vari.other)
-  setvR('mse-route-ekon',routes.esute_kon);setvR('mse-route-panda',routes.panda);setvR('mse-route-elove',routes.esute_love)
-  setvR('mse-route-rank',routes.ranking);setvR('mse-route-japan',routes.japan);setvR('mse-route-zero',routes.zerotwo)
-  setvR('mse-route-hp',routes.hp);setvR('mse-route-sns',routes.sns);setvR('mse-route-other',routes.other)
+  setvN('mse-var-fuel',vari.fuel);setvN('mse-var-consumables',vari.consumables);setvN('mse-var-equipment',vari.equipment);setvN('mse-var-meeting',vari.meeting);setvN('mse-var-other',vari.other)
+  setvR('mse-route-ekon',routes.esute_kon);setvR('mse-route-panda',routes.panda);setvR('mse-route-elove',routes.esute_love);setvR('mse-route-rank',routes.ranking);setvR('mse-route-japan',routes.japan);setvR('mse-route-zero',routes.zerotwo);setvR('mse-route-hp',routes.hp);setvR('mse-route-sns',routes.sns);setvR('mse-route-other',routes.other)
   setvR('mse-new-cust',data?.new_customers);setvR('mse-repeat-cust',data?.repeat_customers)
   setvR('mse-shimei-free',data?.shimei_free);setvR('mse-shimei-net',data?.shimei_net);setvR('mse-shimei-hon',data?.shimei_hon)
   const cArea=document.getElementById('mse-custom-expense-area')
@@ -4678,14 +4683,8 @@ function buildCustomExpenseRow(idx,category='other',label='',amount=''){
     </div>
   </div>`
 }
-function addCustomExpense(){
-  const area=document.getElementById('mse-custom-expense-area'); if(!area) return
-  customExpenseCount++
-  const div=document.createElement('div')
-  div.innerHTML=buildCustomExpenseRow(customExpenseCount)
-  area.appendChild(div.firstElementChild)
-}
-function removeCustomExpense(idx){ const row=document.getElementById('mse-custom-row-'+idx);if(row)row.remove() }
+function addCustomExpense(){const area=document.getElementById('mse-custom-expense-area');if(!area)return;customExpenseCount++;const div=document.createElement('div');div.innerHTML=buildCustomExpenseRow(customExpenseCount);area.appendChild(div.firstElementChild)}
+function removeCustomExpense(idx){const row=document.getElementById('mse-custom-row-'+idx);if(row)row.remove()}
 
 function parseMoneyInput(id){const el=document.getElementById(id);if(!el||el.value==='')return null;const n=parseInt(el.value.replace(/,/g,''));return isNaN(n)?null:n}
 function getvStr(id){const el=document.getElementById(id);return el?el.value.trim():''}
@@ -4707,34 +4706,15 @@ async function saveMonthlySales(){
   const fp=parseMoneyInput('mse-fixed-personnel'),fc=parseMoneyInput('mse-fixed-comm'),fcard=parseMoneyInput('mse-fixed-card')
   const fixed_expenses={personnel:fp,communication:fc,card_fee:fcard}
   const total_fixed=total_ad_expense+total_rent+[fp,fc,fcard].filter(v=>v!=null).reduce((s,v)=>s+v,0)
-  const vf=parseMoneyInput('mse-var-fuel'),vc=parseMoneyInput('mse-var-consumables'),ve=parseMoneyInput('mse-var-equipment')
-  const vm=parseMoneyInput('mse-var-meeting'),vo=parseMoneyInput('mse-var-other')
+  const vf=parseMoneyInput('mse-var-fuel'),vc=parseMoneyInput('mse-var-consumables'),ve=parseMoneyInput('mse-var-equipment'),vm=parseMoneyInput('mse-var-meeting'),vo=parseMoneyInput('mse-var-other')
   const variable_expenses={fuel:vf,consumables:vc,equipment:ve,meeting:vm,other:vo}
   const total_variable=total_utility+[vf,vc,ve,vm,vo].filter(v=>v!=null).reduce((s,v)=>s+v,0)
   const cArea=document.getElementById('mse-custom-expense-area')
   const custom_expenses=[]
-  if(cArea){
-    cArea.querySelectorAll('[id^="mse-custom-row-"]').forEach(row=>{
-      const idx=row.id.replace('mse-custom-row-','')
-      const category=getvStr('mse-custom-cat-'+idx)||'other'
-      const label=getvStr('mse-custom-label-'+idx)
-      const amount=parseMoneyInput('mse-custom-amount-'+idx)
-      if(label&&amount!=null) custom_expenses.push({category,label,amount})
-    })
-  }
+  if(cArea){cArea.querySelectorAll('[id^="mse-custom-row-"]').forEach(row=>{const idx=row.id.replace('mse-custom-row-','');const category=getvStr('mse-custom-cat-'+idx)||'other';const label=getvStr('mse-custom-label-'+idx);const amount=parseMoneyInput('mse-custom-amount-'+idx);if(label&&amount!=null)custom_expenses.push({category,label,amount})})}
   const total_custom=custom_expenses.reduce((s,e)=>s+(e.amount||0),0)
   const total_expenses=total_fixed+total_variable+total_custom
-  const payload={
-    month:monthlyMonth,
-    goal_sales:parseMoneyInput('mse-goal-sales'),goal_count:getvInt('mse-goal-count'),goal_recruit:getvInt('mse-goal-recruit'),
-    actual_recruit:getvInt('mse-actual-recruit'),
-    next_goal_sales:parseMoneyInput('mse-next-goal-sales'),next_goal_count:getvInt('mse-next-goal-count'),next_goal_recruit:getvInt('mse-next-goal-recruit'),
-    ad_expenses,total_ad_expense,rent_expenses,total_rent,utility_expenses,total_utility,
-    fixed_expenses,total_fixed,variable_expenses,total_variable,custom_expenses,total_expenses,
-    acquisition_routes:{esute_kon:getvInt('mse-route-ekon'),panda:getvInt('mse-route-panda'),esute_love:getvInt('mse-route-elove'),ranking:getvInt('mse-route-rank'),japan:getvInt('mse-route-japan'),zerotwo:getvInt('mse-route-zero'),hp:getvInt('mse-route-hp'),sns:getvInt('mse-route-sns'),other:getvInt('mse-route-other')},
-    new_customers:getvInt('mse-new-cust'),repeat_customers:getvInt('mse-repeat-cust'),
-    shimei_free:getvInt('mse-shimei-free'),shimei_net:getvInt('mse-shimei-net'),shimei_hon:getvInt('mse-shimei-hon')
-  }
+  const payload={month:monthlyMonth,goal_sales:parseMoneyInput('mse-goal-sales'),goal_count:getvInt('mse-goal-count'),goal_recruit:getvInt('mse-goal-recruit'),actual_recruit:getvInt('mse-actual-recruit'),next_goal_sales:parseMoneyInput('mse-next-goal-sales'),next_goal_count:getvInt('mse-next-goal-count'),next_goal_recruit:getvInt('mse-next-goal-recruit'),ad_expenses,total_ad_expense,rent_expenses,total_rent,utility_expenses,total_utility,fixed_expenses,total_fixed,variable_expenses,total_variable,custom_expenses,total_expenses,acquisition_routes:{esute_kon:getvInt('mse-route-ekon'),panda:getvInt('mse-route-panda'),esute_love:getvInt('mse-route-elove'),ranking:getvInt('mse-route-rank'),japan:getvInt('mse-route-japan'),zerotwo:getvInt('mse-route-zero'),hp:getvInt('mse-route-hp'),sns:getvInt('mse-route-sns'),other:getvInt('mse-route-other')},new_customers:getvInt('mse-new-cust'),repeat_customers:getvInt('mse-repeat-cust'),shimei_free:getvInt('mse-shimei-free'),shimei_net:getvInt('mse-shimei-net'),shimei_hon:getvInt('mse-shimei-hon')}
   const {error}=await sb.from('monthly_sales').upsert(payload,{onConflict:'month'})
   btn.disabled=false;btn.textContent='💾 保存'
   if(error){toast('保存失敗: '+error.message);return}
@@ -4748,70 +4728,7 @@ function mseSwitchTab(tab){
   const tabs=['expense','goal','route']
   const on='flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
   const off='flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
-  tabs.forEach(t=>{
-    const btn=document.getElementById('mse-tab-'+t)
-    const body=document.getElementById('mse-body-'+t)
-    if(btn) btn.style.cssText=t===tab?on:off
-    if(body) body.style.display=t===tab?'block':'none'
-  })
-}
-
-// ── 延長行HTML生成（ネストしたテンプレートリテラル回避） ──
-function buildExtRows(pj){
-  const extCount=pj.extCount||pj.ext_count||0
-  const extPays=pj.extPay||[]
-  let rows=''
-  for(let i=0;i<extCount;i++){
-    const pay=extPays[i]||'現金'
-    rows+='<div class="rve-ext-row" style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem">'
-    rows+='<span style="color:var(--blue);min-width:60px">延長'+(i+1)+'回目</span>'
-    rows+='<select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">'
-    rows+='<option value="現金" '+(pay==='現金'?'selected':'')+'>💴現金</option>'
-    rows+='<option value="カード" '+(pay==='カード'?'selected':'')+'>💳カード</option>'
-    rows+='</select>'
-    rows+='<button onclick="this.closest(\'.rve-ext-row\').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>'
-    rows+='</div>'
-  }
-  return rows
-}
-
-// ── rveAddExt ──
-function rveAddExt(){
-  const area=document.getElementById('rve-ext-area'); if(!area) return
-  const idx=area.querySelectorAll('.rve-ext-row').length+1
-  const div=document.createElement('div')
-  div.className='rve-ext-row'
-  div.style.cssText='display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem'
-  div.innerHTML=`<span style="color:var(--blue);min-width:60px">延長${idx}回目</span>
-    <select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">
-      <option value="現金">💴現金</option><option value="カード">💳カード</option>
-    </select>
-    <button onclick="this.closest('.rve-ext-row').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>`
-  area.appendChild(div)
-}
-
-// ── 店舗PIN変更 ──
-function openOwnerPinChange(){
-  document.getElementById('owner-pin-change-overlay').classList.add('on')
-  document.getElementById('opc-current').value=''
-  document.getElementById('opc-new1').value=''
-  document.getElementById('opc-new2').value=''
-  document.getElementById('opc-err').textContent=''
-}
-
-function saveOwnerPin(){
-  const current=document.getElementById('opc-current').value
-  const new1=document.getElementById('opc-new1').value
-  const new2=document.getElementById('opc-new2').value
-  const err=document.getElementById('opc-err')
-  err.textContent=''
-  const storedPin=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN_DEFAULT
-  if(current!==storedPin){err.textContent='現在のPINが正しくありません';return}
-  if(new1.length<1||new1.length>8||!/^\d+$/.test(new1)){err.textContent='新しいPINは1〜8桁の数字で入力してください';return}
-  if(new1!==new2){err.textContent='新しいPINが一致しません';return}
-  localStorage.setItem('kyoukano_owner_pin',new1)
-  toast('PINを変更しました。次回ログインから有効です。')
-  closeSheet('owner-pin-change')
+  tabs.forEach(t=>{const btn=document.getElementById('mse-tab-'+t);const body=document.getElementById('mse-body-'+t);if(btn)btn.style.cssText=t===tab?on:off;if(body)body.style.display=t===tab?'block':'none'})
 }
 
 
@@ -4919,27 +4836,6 @@ init()
   </div>
 </div>
 
-<!-- ===== 店舗PIN変更シート ===== -->
-<div class="sheet-overlay" id="owner-pin-change-overlay">
-  <div class="sheet">
-    <div class="sheet-bar"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-      <div class="sheet-title" style="margin:0">🔑 店舗PINを変更</div>
-      <button class="btn btn-gray btn-sm2" onclick="closeSheet('owner-pin-change')">✕</button>
-    </div>
-    <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">現在のPINを確認してから新しいPINを設定（1〜8桁）</div>
-    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">現在のPIN</div>
-      <input type="password" id="opc-current" class="fi" maxlength="8" inputmode="numeric" placeholder="現在のPINを入力"></div>
-    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（1〜8桁）</div>
-      <input type="password" id="opc-new1" class="fi" maxlength="8" inputmode="numeric" placeholder="新しいPINを入力"></div>
-    <div style="margin-bottom:.75rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（確認）</div>
-      <input type="password" id="opc-new2" class="fi" maxlength="8" inputmode="numeric" placeholder="もう一度入力"></div>
-    <div id="opc-err" style="color:#c62828;font-size:.82rem;margin-bottom:.5rem"></div>
-    <button class="btn btn-gold" style="width:100%" onclick="saveOwnerPin()">🔑 PINを変更する</button>
-    <button class="btn btn-gray" style="width:100%;margin-top:.5rem" onclick="closeSheet('owner-pin-change')">閉じる</button>
-  </div>
-</div>
-
 <!-- ===== キャストPIN詳細シート ===== -->
 <div class="sheet-overlay" id="cast-pin-detail-overlay">
   <div class="sheet">
@@ -4949,16 +4845,15 @@ init()
       <button class="btn btn-gray btn-sm2" onclick="closeSheet('cast-pin-detail')">✕</button>
     </div>
     <input type="hidden" id="cpd-cast-id">
-    <!-- 現在のPIN表示 -->
     <div style="background:var(--surface2);border-radius:12px;padding:.75rem 1rem;margin-bottom:1rem;text-align:center">
       <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">現在のPIN</div>
       <div id="cpd-current-display" style="font-size:2rem;font-weight:700;letter-spacing:.25em;color:var(--accent)">----</div>
     </div>
-    <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:.75rem">PINを変更する</div>
-    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（4桁）</div>
-      <input type="password" id="cpd-new" class="fi" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+    <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:.75rem">PINを変更する（最大8桁）</div>
+    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN</div>
+      <input type="password" id="cpd-new" class="fi" maxlength="8" inputmode="numeric" placeholder="1〜8桁の数字"></div>
     <div style="margin-bottom:.75rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">確認</div>
-      <input type="password" id="cpd-confirm" class="fi" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+      <input type="password" id="cpd-confirm" class="fi" maxlength="8" inputmode="numeric" placeholder="もう一度入力"></div>
     <div id="cpd-err" style="color:#c62828;font-size:.82rem;margin-bottom:.5rem"></div>
     <button class="btn btn-gold" style="width:100%" onclick="saveCastPinDetail()">💾 変更する</button>
     <button class="btn btn-gray" style="width:100%;margin-top:.5rem" onclick="closeSheet('cast-pin-detail')">閉じる</button>
