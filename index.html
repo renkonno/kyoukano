@@ -360,6 +360,11 @@ tr:last-child td{border-bottom:none}
       </div>
       <div id="owner-cal-grid"></div>
       <div style="font-size:.72rem;color:var(--text3);margin:.4rem 0 .25rem">📋 日付をタップして詳細確認・承認できます</div>
+      <!-- ルーム状況（本日） -->
+      <div style="margin-top:.5rem;margin-bottom:.5rem">
+        <div class="sec" style="margin-bottom:.4rem">🏠 本日のルーム状況</div>
+        <div id="owner-shift-room-grid" class="room-grid"></div>
+      </div>
       <div id="owner-shift-area" style="margin-top:.25rem"><div class="spin">読み込み中...</div></div>
 
     </div>
@@ -420,11 +425,11 @@ tr:last-child td{border-bottom:none}
         <button class="cal-nav-btn" onclick="monthlyMove(1)">›</button>
       </div>
       <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.6rem;gap:3px">
-        <button id="monthly-tab-summary" onclick="monthlyTabSwitch('summary')" style="flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">📊 月まとめ</button>
-        <button id="monthly-tab-daily" onclick="monthlyTabSwitch('daily')" style="flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">📅 日別</button>
-        <button id="monthly-tab-cast" onclick="monthlyTabSwitch('cast')" style="flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">👤 キャスト</button>
-        <button id="monthly-tab-expense" onclick="monthlyTabSwitch('expense')" style="flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">💸 経費</button>
-        <button id="monthly-tab-chart" onclick="monthlyTabSwitch('chart')" style="flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">🥧 グラフ</button>
+        <button id="monthly-tab-summary" onclick="monthlyTabSwitch('summary')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">📊 月まとめ</button>
+        <button id="monthly-tab-daily" onclick="monthlyTabSwitch('daily')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">📅 日別</button>
+        <button id="monthly-tab-cast" onclick="monthlyTabSwitch('cast')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">👤 キャスト</button>
+        <button id="monthly-tab-expense" onclick="monthlyTabSwitch('expense')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">💸 経費</button>
+        <button id="monthly-tab-chart" onclick="monthlyTabSwitch('chart')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">🥧 グラフ</button>
       </div>
       <div id="monthly-area"><div class="spin">読み込み中...</div></div>
     </div>
@@ -1224,8 +1229,8 @@ function renderCal(){
     }
     if(!color&&!s){color=dow===0?'var(--rtx)':dow===6?'var(--btx)':'var(--text2)'}
     const opacity=isPast?'0.3':''
-    const cursor=isPast?'default':'pointer'
-    const onclick=isPast?'':'selectDay(\''+ds+'\')'
+    const cursor='pointer'
+    const onclick='selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'出勤':'却下'):''
     const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.6rem;line-height:1.2">${statusText}</span>`:''}</div>`
     html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
@@ -2282,6 +2287,27 @@ async function loadOwnerCal(){
   while(col2<7&&col2>0){cal+=`<td style="height:${cellSize2}"></td>`;col2++}
   cal+='</tr></tbody></table>'
   document.getElementById('owner-cal-grid').innerHTML=cal
+
+  // ── ルーム状況（本日）をシフト管理ページに表示 ──
+  const ownerRoomGrid=document.getElementById('owner-shift-room-grid')
+  if(ownerRoomGrid){
+    const todayStr2=today()
+    const todayApproved=(approved||[]).filter(s=>s.date===todayStr2)
+    const rm2={}
+    todayApproved.forEach(s=>{if(s.room){if(!rm2[s.room])rm2[s.room]=[];rm2[s.room].push(s)}})
+    let rh2=''
+    ROOMS.forEach(r=>{
+      const ss2=rm2[r]
+      const rc2=getRoomColor(r)
+      if(ss2&&ss2.length){
+        const names2=ss2.map(s=>`<div style="font-size:${ss2.length>1?'.78rem':'.85rem'};font-weight:700;color:${rc2.tx}">${s.casts?.name||'?'}<span style="font-size:.58rem;font-weight:400;margin-left:.25rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span></div>`).join('')
+        rh2+=`<div class="room-card" style="background:${rc2.card};border-color:${rc2.bd}"><div class="room-lbl" style="color:${rc2.tx}">${r}</div>${names2}</div>`
+      } else {
+        rh2+=`<div class="room-card"><div class="room-lbl">${r}</div><div class="room-empty">空き</div></div>`
+      }
+    })
+    ownerRoomGrid.innerHTML=rh2
+  }
 
   // 承認待ち一覧をエリアに表示
   const area=document.getElementById('owner-shift-area')
@@ -3839,8 +3865,8 @@ async function openShiftReservations(shiftId, castName){
         <div style="font-size:.6rem;color:#1565c0;font-weight:700;margin-bottom:.2rem">💳 カード内訳</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;text-align:center">
           <div><div style="font-size:.58rem;color:#555">カード金額</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div></div>
-          <div><div style="font-size:.58rem;color:#555">手数料(10%)</div><div style="font-size:.78rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.1))}</div></div>
-          <div><div style="font-size:.58rem;color:#555">手数料込合計</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(cardAmt+Math.floor(cardAmt*0.1))}</div></div>
+          <div><div style="font-size:.58rem;color:#555">手数料(6%+80円)</div><div style="font-size:.78rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.06)+80)}</div></div>
+          <div><div style="font-size:.58rem;color:#555">手数料込合計</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(cardAmt+Math.floor(cardAmt*0.06)+80)}</div></div>
         </div>
       </div>`:''}
       ${r.note?`<div style="font-size:.75rem;color:var(--text3)">📝 ${r.note}</div>`:''}
@@ -3958,8 +3984,8 @@ async function openRvDetail(rvId, shiftId, castName){
         <div style="font-size:.62rem;color:#1565c0;font-weight:700;margin-bottom:.25rem">💳 カード内訳</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;text-align:center">
           <div><div style="font-size:.6rem;color:#555">カード金額</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div></div>
-          <div><div style="font-size:.6rem;color:#555">手数料(10%)</div><div style="font-size:.85rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.1))}</div></div>
-          <div><div style="font-size:.6rem;color:#555">手数料込合計</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(cardAmt+Math.floor(cardAmt*0.1))}</div></div>
+          <div><div style="font-size:.6rem;color:#555">手数料(6%+80円)</div><div style="font-size:.85rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.06)+80)}</div></div>
+          <div><div style="font-size:.6rem;color:#555">手数料込合計</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(cardAmt+Math.floor(cardAmt*0.06)+80)}</div></div>
         </div>
       </div>`:''}
       <div class="fee-sec">
@@ -4260,8 +4286,8 @@ function monthlyMove(d){ monthlyMonth=addMonth(monthlyMonth,d); monthlyCachedDat
 
 function monthlyTabSwitch(mode){
   monthlyTabMode=mode
-  const on='flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
-  const off='flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
+  const on='flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
+  const off='flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
   ;['summary','daily','cast','expense','chart'].forEach(t=>{
     const btn=document.getElementById('monthly-tab-'+t)
     if(btn) btn.style.cssText=t===mode?on:off
@@ -4287,7 +4313,6 @@ async function renderMonthlyContent(){
   const {data:castList}=await sb.from('casts').select('id,name')
   const getName=id=>{const c=(castList||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
   const works=(worksRaw||[]).map(w=>({...w,castName:getName(w.cast_id)}))
-
   const {data:shiftsRaw}=await sb.from('shifts').select('id,cast_id,date,status').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01')
   let rvs=[]
   if(shiftsRaw&&shiftsRaw.length){
@@ -4316,28 +4341,21 @@ async function renderMonthlyContent(){
     return {total,card,cash:total-card,shimei:r.shimei_type||'フリー',isNew:!!(r.is_new===true||r.is_new==='true')}
   }
 
-  const shiftDateMap={}
-  const shiftCastMap={}
-  ;(shiftsRaw||[]).forEach(s=>{shiftDateMap[s.id]=s.date; shiftCastMap[s.id]=s.cast_id})
-  const rvsByDate={}
-  const rvsByCast={}
+  const shiftDateMap={},shiftCastMap={}
+  ;(shiftsRaw||[]).forEach(s=>{shiftDateMap[s.id]=s.date;shiftCastMap[s.id]=s.cast_id})
+  const rvsByDate={},rvsByCast={}
   rvs.forEach(r=>{
     const d=shiftDateMap[r.shift_id]; if(!d) return
     if(!rvsByDate[d]) rvsByDate[d]=[]
     rvsByDate[d].push(r)
-    const castId=shiftCastMap[r.shift_id]
-    const castName=getName(castId)
-    if(!rvsByCast[castName]) rvsByCast[castName]={free:0,net:0,hon:0,count:0}
+    const castName=getName(shiftCastMap[r.shift_id])
+    if(!rvsByCast[castName]) rvsByCast[castName]={free:0,net:0,hon:0}
     if(r.shimei_type==='フリー') rvsByCast[castName].free++
     else if(r.shimei_type==='ネット指名') rvsByCast[castName].net++
     else if(r.shimei_type==='本指名') rvsByCast[castName].hon++
-    rvsByCast[castName].count++
   })
   const worksByDate={}
-  ;(works||[]).forEach(w=>{
-    if(!worksByDate[w.date]) worksByDate[w.date]=[]
-    worksByDate[w.date].push(w)
-  })
+  ;(works||[]).forEach(w=>{if(!worksByDate[w.date])worksByDate[w.date]=[];worksByDate[w.date].push(w)})
 
   const daysInMonth=new Date(y,m,0).getDate()
   const dows=['日','月','火','水','木','金','土']
@@ -4347,25 +4365,17 @@ async function renderMonthlyContent(){
     const dow=dows[new Date(y,m-1,day).getDay()]
     const dayWorks=worksByDate[dateStr]||[]
     const dayRvs=rvsByDate[dateStr]||[]
-    if(!dayWorks.length&&!dayRvs.length){ dailyRows.push({day,dow,dateStr,noData:true}); continue }
+    if(!dayWorks.length&&!dayRvs.length){dailyRows.push({day,dow,dateStr,noData:true});continue}
     const gross_work=dayWorks.reduce((s,w)=>s+(w.sales||0),0)
     const net=dayWorks.reduce((s,w)=>s+(w.net||w.back||0),0)
     const misc=dayWorks.reduce((s,w)=>s+(w.misc||0),0)
     const count=dayWorks.reduce((s,w)=>s+(w.count||0),0)
     const disc=dayWorks.reduce((s,w)=>s+((w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)),0)
-    const gross=gross_work+disc
     let card=0,cash=0,rvFree=0,rvNet=0,rvHon=0,newCount=0,repeatCount=0
-    dayRvs.forEach(r=>{
-      const am=calcRv(r)
-      card+=am.card;cash+=am.cash
-      if(am.shimei==='フリー') rvFree++
-      else if(am.shimei==='ネット指名') rvNet++
-      else if(am.shimei==='本指名') rvHon++
-      if(am.isNew) newCount++;else repeatCount++
-    })
-    const cardFee=Math.floor(card*0.1)
+    dayRvs.forEach(r=>{const am=calcRv(r);card+=am.card;cash+=am.cash;if(am.shimei==='フリー')rvFree++;else if(am.shimei==='ネット指名')rvNet++;else if(am.shimei==='本指名')rvHon++;if(am.isNew)newCount++;else repeatCount++})
+    const cardFee=Math.floor(card*0.06)+80
     const profit=gross_work-net-misc
-    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
+    dailyRows.push({day,dow,dateStr,gross:gross_work+disc,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
   }
 
   const vr=dailyRows.filter(r=>!r.noData)
@@ -4381,21 +4391,15 @@ async function renderMonthlyContent(){
   }
   tot.avg_unit=tot.count>0?Math.round(tot.gross_work/tot.count):0
 
-  // キャスト別集計（worksとrvsByCastを結合）
   const castStats={}
   works.forEach(w=>{
     const n=w.castName
-    if(!castStats[n]) castStats[n]={sales:0,net:0,hosho:0,count:0,free:0,net_shimei:0,hon_shimei:0}
-    castStats[n].sales+=w.sales||0
-    castStats[n].net+=w.net||w.back||0
-    castStats[n].hosho+=w.hosho||0
-    castStats[n].count+=w.count||0
+    if(!castStats[n])castStats[n]={sales:0,net:0,hosho:0,count:0}
+    castStats[n].sales+=w.sales||0;castStats[n].net+=w.net||w.back||0;castStats[n].hosho+=w.hosho||0;castStats[n].count+=w.count||0
   })
   Object.entries(rvsByCast).forEach(([n,rv])=>{
-    if(!castStats[n]) castStats[n]={sales:0,net:0,hosho:0,count:0,free:0,net_shimei:0,hon_shimei:0}
-    castStats[n].free=rv.free
-    castStats[n].net_shimei=rv.net
-    castStats[n].hon_shimei=rv.hon
+    if(!castStats[n])castStats[n]={sales:0,net:0,hosho:0,count:0}
+    castStats[n].free=rv.free;castStats[n].net_shimei=rv.net;castStats[n].hon_shimei=rv.hon
   })
 
   const customExpenses=sd.custom_expenses||[]
@@ -4423,13 +4427,22 @@ function renderMonthlyFromCache(){
 function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   const pct=(a,b)=>b>0?Math.round(a/b*100)+'%':'-'
   const pctColor=(a,b)=>a>=b?'color:#4caf50':'color:var(--accent)'
-  let html=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.65rem">`
-  ;[['総売上高',fmt2(tot.gross)],['純売上高',fmt2(tot.gross_work)],['割引計',tot.disc>0?'-¥'+tot.disc.toLocaleString():'¥0'],
-    ['委託金',fmt2(tot.net)],['雑費',tot.misc>0?'-¥'+tot.misc.toLocaleString():'¥0'],['粗利益',fmt2(tot.profit)],
-    ['現金売上',fmt2(tot.cash)],['カード売上',fmt2(tot.card)],['カード手数料','-¥'+(tot.cardFee||0).toLocaleString()],
-    ['出勤延べ',tot.attendance+'名'],['施術件数',tot.count+'本'],['平均客単価',fmt2(tot.avg_unit)],
-  ].forEach(([l,v])=>{ html+=`<div class="kpi"><div class="kpi-l" style="font-size:.6rem">${l}</div><div class="kpi-v" style="font-size:.75rem">${v}</div></div>` })
-  html+='</div>'
+  // KPIカード（白背景、2列×3行 + 2列×3行）
+  const kpiCard=(l,v,col='')=>`<div style="background:#fff;border-radius:10px;padding:.6rem .5rem;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,.07)"><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">${l}</div><div style="font-size:.82rem;font-weight:700${col?';color:'+col:''}">${v}</div></div>`
+  let html=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.45rem;margin-bottom:.5rem">
+    ${kpiCard('総売上高',fmt2(tot.gross))}
+    ${kpiCard('割引',tot.disc>0?'-¥'+tot.disc.toLocaleString():'¥0','#c62828')}
+    ${kpiCard('純売上高',fmt2(tot.gross_work))}
+    ${kpiCard('委託金',fmt2(tot.net))}
+    ${kpiCard('雑費',tot.misc>0?'-¥'+tot.misc.toLocaleString():'¥0')}
+    ${kpiCard('粗利益',fmt2(tot.profit))}
+    ${kpiCard('現金売上',fmt2(tot.cash))}
+    ${kpiCard('カード売上',fmt2(tot.card))}
+    ${kpiCard('カード手数料',tot.cardFee>0?'-¥'+tot.cardFee.toLocaleString():'¥0')}
+    ${kpiCard('出勤延べ',tot.attendance+'名')}
+    ${kpiCard('施術件数',tot.count+'本')}
+    ${kpiCard('平均客単価',fmt2(tot.avg_unit))}
+  </div>`
   const goal_sales=sd.goal_sales,goal_count=sd.goal_count
   html+=`<div class="card" style="margin-bottom:.55rem">
     <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">🎯 月間目標</div>
@@ -4444,9 +4457,9 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   html+=`<div class="card" style="margin-bottom:.55rem">
     <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">👆 指名内訳</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;font-size:.82rem;text-align:center">
-      <div><div style="font-size:.62rem;color:var(--text3)">フリー</div><div style="font-weight:700">${tot.free}本</div></div>
-      <div><div style="font-size:.62rem;color:var(--text3)">ネット指名</div><div style="font-weight:700">${tot.net_shimei}本</div></div>
-      <div><div style="font-size:.62rem;color:var(--text3)">本指名</div><div style="font-weight:700">${tot.hon_shimei}本</div></div>
+      <div style="background:#fff;border-radius:8px;padding:.5rem;box-shadow:0 1px 4px rgba(0,0,0,.06)"><div style="font-size:.62rem;color:var(--text3)">フリー</div><div style="font-weight:700">${tot.free}本</div></div>
+      <div style="background:#fff;border-radius:8px;padding:.5rem;box-shadow:0 1px 4px rgba(0,0,0,.06)"><div style="font-size:.62rem;color:var(--text3)">ネット指名</div><div style="font-weight:700">${tot.net_shimei}本</div></div>
+      <div style="background:#fff;border-radius:8px;padding:.5rem;box-shadow:0 1px 4px rgba(0,0,0,.06)"><div style="font-size:.62rem;color:var(--text3)">本指名</div><div style="font-weight:700">${tot.hon_shimei}本</div></div>
     </div></div>`
   if(total_expenses>0){
     html+=`<div class="card" style="margin-bottom:.55rem">
@@ -4456,27 +4469,32 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   area.innerHTML=html
 }
 
+// ── 日別テーブル：白背景セル ──
 function renderMonthlyDaily(area,dailyRows,tot){
   const N=n=>(n||0).toLocaleString()
+  const wBg='background:#fff;border-radius:6px;'
   const cols=[
-    {l:'日付',w:'46px',align:'left',sticky:true},
-    {l:'総売上',w:'58px'},{l:'純売上',w:'58px'},{l:'割引',w:'44px'},
+    {l:'日付',w:'48px',align:'left',sticky:true},
+    {l:'総売上',w:'60px'},{l:'純売上',w:'60px'},{l:'割引',w:'46px'},
     {l:'委託',w:'52px'},{l:'粗利',w:'52px'},{l:'現金',w:'52px'},
     {l:'カード',w:'52px',color:'#1565c0'},{l:'件',w:'26px'},
     {l:'F',w:'22px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
   ]
-  const thStyle=(c,i)=>`padding:.28rem ${i===0?.28:.18}rem;text-align:${c.align||'right'};font-size:.62rem;white-space:nowrap;background:var(--surface2);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
+  const thStyle=(c,i)=>`padding:.3rem ${i===0?.3:.2}rem;text-align:${c.align||'right'};font-size:.63rem;white-space:nowrap;background:var(--surface2);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
   const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thStyle(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
-  const stickyTd=`padding:.22rem .28rem;position:sticky;left:0;background:var(--surface);font-size:.65rem;font-weight:600;white-space:nowrap;z-index:1`
-  const td=(v,color='',bold=false)=>`<td style="text-align:right;padding:.22rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}">${v}</td>`
+  const stickyTd=`padding:.2rem .3rem;position:sticky;left:0;background:#faf6f0;font-size:.66rem;font-weight:600;white-space:nowrap;z-index:1`
+  const td=(v,color='',bold=false,extra='')=>`<td style="text-align:right;padding:.2rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}${extra?';'+extra:''}">${v}</td>`
   const makeRow=r=>{
     if(r.noData) return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
-      <td style="${stickyTd}">${r.day}(${r.dow})</td><td colspan="11" style="text-align:right;padding:.22rem .18rem;font-size:.6rem">—</td></tr>`
+      <td style="${stickyTd}">${r.day}(${r.dow})</td><td colspan="11" style="text-align:right;padding:.2rem;font-size:.6rem">—</td></tr>`
+    // 数字セルに白背景ボックスをつける
+    const cell=(v,c='',b=false)=>`<td style="padding:.2rem .15rem"><div style="${wBg}padding:.22rem .2rem;text-align:right;font-size:.65rem;${c?'color:'+c:''}${b?';font-weight:700':''}">${v}</div></td>`
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="${stickyTd}">${r.day}(${r.dow})</td>
-      ${td(N(r.gross))}${td(N(r.gross_work))}${td(r.disc>0?N(r.disc):'0','#c62828')}
-      ${td(N(r.net))}${td(N(r.profit),'',true)}${td(N(r.cash))}
-      ${td(N(r.card),'#1565c0')}${td(r.count||0)}${td(r.free||0)}${td(r.net_shimei||0)}${td(r.hon_shimei||0)}
+      ${cell(N(r.gross))}${cell(N(r.gross_work))}${cell(r.disc>0?N(r.disc):'0','#c62828')}
+      ${cell(N(r.net))}${cell(N(r.profit),'',true)}${cell(N(r.cash))}
+      ${cell(N(r.card),'#1565c0')}${cell(r.count||0)}
+      ${cell(r.free||0)}${cell(r.net_shimei||0)}${cell(r.hon_shimei||0)}
     </tr>`
   }
   const totRow=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.65rem">
@@ -4489,69 +4507,41 @@ function renderMonthlyDaily(area,dailyRows,tot){
     <table style="width:100%;border-collapse:collapse;min-width:480px">${thead}<tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody></table></div>`
 }
 
-// ── キャスト別月間成績表 ──
+// ── キャスト成績表：白背景セル ──
 function renderMonthlyCast(area,castStats,fmt2){
-  if(!castStats||!Object.keys(castStats).length){
-    area.innerHTML='<div class="empty">この月の記録はありません</div>'
-    return
-  }
-  const rows=Object.entries(castStats).map(([name,s])=>{
-    const total=s.count||0
-    const shimei=(s.free||0)+(s.net_shimei||0)+(s.hon_shimei||0)
-    return {name,total,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,
-      sales:s.sales||0,net:s.net||0,hosho:s.hosho||0}
-  }).sort((a,b)=>b.sales-a.sales)
-
-  // サマリーカード（全体合計）
-  const totSales=rows.reduce((s,r)=>s+r.sales,0)
-  const totNet=rows.reduce((s,r)=>s+r.net,0)
-  const totHosho=rows.reduce((s,r)=>s+r.hosho,0)
-  const totTotal=rows.reduce((s,r)=>s+r.total,0)
-  const totFree=rows.reduce((s,r)=>s+r.free,0)
-  const totNetS=rows.reduce((s,r)=>s+r.net_shimei,0)
-  const totHon=rows.reduce((s,r)=>s+r.hon_shimei,0)
-
-  let html=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border);margin-bottom:.75rem">
-    <table style="width:100%;border-collapse:collapse;min-width:500px;font-size:.72rem">
-      <thead>
-        <tr style="background:var(--surface2)">
-          <th style="padding:.35rem .4rem;text-align:left;font-size:.66rem;position:sticky;left:0;z-index:2;background:var(--surface2)">キャスト</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem">総本数</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem">F</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem">ネット</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem">本指</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem;min-width:70px">売上</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem;min-width:70px">委託金</th>
-          <th style="padding:.35rem .3rem;text-align:right;font-size:.66rem;min-width:60px">保証</th>
-        </tr>
-      </thead>
+  if(!castStats||!Object.keys(castStats).length){area.innerHTML='<div class="empty">この月の記録はありません</div>';return}
+  const rows=Object.entries(castStats).map(([name,s])=>({name,total:s.count||0,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,sales:s.sales||0,net:s.net||0,hosho:s.hosho||0})).sort((a,b)=>b.sales-a.sales)
+  const wBg='background:#fff;border-radius:6px;padding:.3rem .3rem;text-align:right;font-size:.72rem;'
+  const th=(l,w='')=>`<th style="padding:.35rem .3rem;text-align:right;font-size:.66rem;${w?'min-width:'+w:''};background:var(--surface2)">${l}</th>`
+  const cell=(v,bold=false,col='')=>`<td style="padding:.25rem .2rem"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
+  const totSales=rows.reduce((s,r)=>s+r.sales,0),totNet=rows.reduce((s,r)=>s+r.net,0),totHosho=rows.reduce((s,r)=>s+r.hosho,0),totTotal=rows.reduce((s,r)=>s+r.total,0),totFree=rows.reduce((s,r)=>s+r.free,0),totNetS=rows.reduce((s,r)=>s+r.net_shimei,0),totHon=rows.reduce((s,r)=>s+r.hon_shimei,0)
+  let html=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse;min-width:480px;font-size:.72rem">
+      <thead><tr style="background:var(--surface2)">
+        <th style="padding:.35rem .4rem;text-align:left;font-size:.66rem;position:sticky;left:0;z-index:2;background:var(--surface2)">キャスト</th>
+        ${th('総本数')}${th('F')}${th('ネット')}${th('本指')}${th('売上','68px')}${th('委託金','68px')}${th('保証','55px')}
+      </tr></thead>
       <tbody>
         ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:.3rem .4rem;position:sticky;left:0;background:var(--surface);font-weight:600;font-size:.72rem;white-space:nowrap;z-index:1">${r.name}</td>
-          <td style="text-align:right;padding:.3rem .3rem;font-weight:600">${r.total}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${r.free}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${r.net_shimei}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${r.hon_shimei}</td>
-          <td style="text-align:right;padding:.3rem .3rem;font-weight:600">¥${r.sales.toLocaleString()}</td>
-          <td style="text-align:right;padding:.3rem .3rem">¥${r.net.toLocaleString()}</td>
-          <td style="text-align:right;padding:.3rem .3rem;color:var(--blue)">${r.hosho>0?'¥'+r.hosho.toLocaleString():'-'}</td>
+          <td style="padding:.3rem .4rem;position:sticky;left:0;background:#faf6f0;font-weight:600;font-size:.72rem;white-space:nowrap;z-index:1">${r.name}</td>
+          ${cell(r.total,true)}${cell(r.free)}${cell(r.net_shimei)}${cell(r.hon_shimei)}
+          ${cell('¥'+r.sales.toLocaleString(),true)}${cell('¥'+r.net.toLocaleString())}
+          ${cell(r.hosho>0?'¥'+r.hosho.toLocaleString():'-',false,'var(--blue)')}
         </tr>`).join('')}
       </tbody>
-      <tfoot>
-        <tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.7rem">
-          <td style="padding:.3rem .4rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-          <td style="text-align:right;padding:.3rem .3rem">${totTotal}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${totFree}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${totNetS}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${totHon}</td>
-          <td style="text-align:right;padding:.3rem .3rem">¥${totSales.toLocaleString()}</td>
-          <td style="text-align:right;padding:.3rem .3rem">¥${totNet.toLocaleString()}</td>
-          <td style="text-align:right;padding:.3rem .3rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
-        </tr>
-      </tfoot>
+      <tfoot><tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.7rem">
+        <td style="padding:.3rem .4rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
+        <td style="text-align:right;padding:.3rem">${totTotal}</td>
+        <td style="text-align:right;padding:.3rem">${totFree}</td>
+        <td style="text-align:right;padding:.3rem">${totNetS}</td>
+        <td style="text-align:right;padding:.3rem">${totHon}</td>
+        <td style="text-align:right;padding:.3rem">¥${totSales.toLocaleString()}</td>
+        <td style="text-align:right;padding:.3rem">¥${totNet.toLocaleString()}</td>
+        <td style="text-align:right;padding:.3rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
+      </tr></tfoot>
     </table>
   </div>
-  <div style="font-size:.7rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.7rem"><span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
+  <div style="font-size:.7rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.7rem;margin-top:.4rem"><span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
   area.innerHTML=html
 }
 
@@ -4566,7 +4556,7 @@ function renderMonthlyExpense(area,sd,fmt2,total_ad,total_rent,total_util,total_
   html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">💡 水道光熱費</div>${row('エスレジデンス',util.es_residence)}${row('アンナマリー',util.anna_marie)}${row('ハニリリカ',util.hani_lilika)}${row('パークフラッツ',util.park_flats)}${totRow('小計',total_util)}</div>`
   html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📋 その他固定費</div>${row('人件費',fixed.personnel)}${row('通信費',fixed.communication)}${row('カード決済',fixed.card_fee)}${totRow('固定費合計',total_fixed)}</div>`
   html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📦 変動費</div>${row('燃料費',vari.fuel)}${row('消耗品',vari.consumables)}${row('備品費',vari.equipment)}${row('会議費',vari.meeting)}${row('その他',vari.other)}${totRow('変動費合計',total_vari)}</div>`
-  if(customExpenses.length){ html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">➕ 追加経費</div>${customExpenses.map(e=>row('['+e.category+'] '+e.label,e.amount)).join('')}${totRow('小計',total_custom)}</div>` }
+  if(customExpenses.length){html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">➕ 追加経費</div>${customExpenses.map(e=>row('['+e.category+'] '+e.label,e.amount)).join('')}${totRow('小計',total_custom)}</div>`}
   html+=`<div class="card" style="margin-bottom:.5rem;background:var(--surface2)"><div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700"><span>💸 経費合計</span><span style="color:var(--accent)">${fmt2(total_expenses)}</span></div></div>`
   html+=`<button class="btn btn-gold" style="width:100%;margin-bottom:1rem" onclick="openMonthlySalesEdit()">✏️ 経費を編集する</button>`
   area.innerHTML=html
@@ -4583,26 +4573,17 @@ function drawPieChart(canvasId,data,colors){
   data.forEach((d,i)=>{
     const sweep=(d.value/total)*Math.PI*2
     ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,start+sweep)
-    ctx.fillStyle=colors[i%colors.length];ctx.fill()
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke()
+    ctx.fillStyle=colors[i%colors.length];ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke()
     const pct=Math.round(d.value/total*100)
-    if(pct>=5){
-      const mid=start+sweep/2
-      ctx.fillStyle='#fff';ctx.font='bold 11px serif';ctx.textAlign='center';ctx.textBaseline='middle'
-      ctx.fillText(pct+'%',cx+Math.cos(mid)*(r*0.65),cy+Math.sin(mid)*(r*0.65))
-    }
+    if(pct>=5){const mid=start+sweep/2;ctx.fillStyle='#fff';ctx.font='bold 11px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(pct+'%',cx+Math.cos(mid)*(r*0.65),cy+Math.sin(mid)*(r*0.65))}
     start+=sweep
   })
 }
-
-function monthlyLegend(data,colors){
-  return data.map((d,i)=>`<div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem"><div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div><span>${d.label}：${d.value}</span></div>`).join('')
-}
+function monthlyLegend(data,colors){return data.map((d,i)=>`<div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem"><div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div><span>${d.label}：${d.value}</span></div>`).join('')}
 
 function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total_util,total_fixed,total_vari){
   const routeColors=['#ff6384','#36a2eb','#ffce56','#4bc0c0','#9966ff','#ff9f40','#c9cbcf','#4caf50','#ff5722']
-  const shimeiColors=['#36a2eb','#ffce56','#ff6384']
-  const visitColors=['#4caf50','#ff9f40']
+  const shimeiColors=['#36a2eb','#ffce56','#ff6384'],visitColors=['#4caf50','#ff9f40']
   const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
   const routes=sd.acquisition_routes||{}
   const routeData=routeItems.map(([l,k])=>({label:l,value:routes[k]||0})).filter(d=>d.value>0)
@@ -4611,7 +4592,7 @@ function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total
   const repV=sd.repeat_customers!=null?sd.repeat_customers:tot.repeatCount
   const visitData=[{label:'新規',value:newV},{label:'再来',value:repV}].filter(d=>d.value>0)
   const pie=(id,data,colors,label)=>`<div class="card" style="margin-bottom:.55rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">${label}</div>${data.length?`<div style="display:flex;justify-content:center;margin-bottom:.4rem"><canvas id="${id}" width="180" height="180"></canvas></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:.2rem">${monthlyLegend(data,colors)}</div>`:'<div style="color:var(--text3);font-size:.8rem">データなし</div>'}</div>`
-  area.innerHTML=pie('chart-route',routeData,routeColors,'📣 集客経路')+pie('chart-shimei',shimeiData,shimeiColors,'👆 指名内訳')+pie('chart-visit',visitData,visitColors,'👥 来店分類（新規／再来）')
+  area.innerHTML=pie('chart-route',routeData,routeColors,'📣 集客経路')+pie('chart-shimei',shimeiData,shimeiColors,'👆 指名内訳')+pie('chart-visit',visitData,visitColors,'👥 来店分類')
   requestAnimationFrame(()=>{
     if(routeData.length) drawPieChart('chart-route',routeData,routeColors)
     if(shimeiData.length) drawPieChart('chart-shimei',shimeiData,shimeiColors)
@@ -4668,7 +4649,6 @@ function buildCustomExpenseRow(idx,category='other',label='',amount=''){
 }
 function addCustomExpense(){const area=document.getElementById('mse-custom-expense-area');if(!area)return;customExpenseCount++;const div=document.createElement('div');div.innerHTML=buildCustomExpenseRow(customExpenseCount);area.appendChild(div.firstElementChild)}
 function removeCustomExpense(idx){const row=document.getElementById('mse-custom-row-'+idx);if(row)row.remove()}
-
 function parseMoneyInput(id){const el=document.getElementById(id);if(!el||el.value==='')return null;const n=parseInt(el.value.replace(/,/g,''));return isNaN(n)?null:n}
 function getvStr(id){const el=document.getElementById(id);return el?el.value.trim():''}
 function getvInt(id){const el=document.getElementById(id);return el&&el.value!==''?parseInt(el.value)||null:null}
