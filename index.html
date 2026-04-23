@@ -4637,9 +4637,9 @@ function renderMonthlyDaily(area,dailyRows,tot){
     {l:'総売上',w:'60px'},{l:'純売上',w:'60px'},{l:'割引',w:'46px'},
     {l:'委託',w:'52px'},{l:'粗利',w:'52px'},{l:'現金',w:'52px'},
     {l:'カード',w:'52px',color:'#1565c0'},{l:'件',w:'26px'},
-    {l:'F',w:'22px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
+    {l:'フリー',w:'32px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
   ]
-  const thStyle=(c,i)=>`padding:.3rem ${i===0?.3:.2}rem;text-align:${c.align||'right'};font-size:.63rem;white-space:nowrap;background:var(--surface2);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
+  const thStyle=(c,i)=>`padding:.3rem ${i===0?.3:.2}rem;text-align:${c.align||'right'};font-size:.63rem;white-space:nowrap;background:#fff;border-bottom:1.5px solid var(--border);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
   const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thStyle(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
   const stickyTd=`padding:.2rem .3rem;position:sticky;left:0;background:#faf6f0;font-size:.66rem;font-weight:600;white-space:nowrap;z-index:1`
   const td=(v,color='',bold=false,extra='')=>`<td style="text-align:right;padding:.2rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}${extra?';'+extra:''}">${v}</td>`
@@ -4647,7 +4647,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     if(r.noData) return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
       <td style="${stickyTd}">${r.day}(${r.dow})</td><td colspan="11" style="text-align:right;padding:.2rem;font-size:.6rem">—</td></tr>`
     // 数字セルに白背景ボックスをつける
-    const cell=(v,c='',b=false)=>`<td style="padding:.2rem .15rem"><div style="${wBg}padding:.22rem .2rem;text-align:right;font-size:.65rem;${c?'color:'+c:''}${b?';font-weight:700':''}">${v}</div></td>`
+    const cell=(v,c='',b=false)=>`<td style="padding:.2rem .12rem"><div style="${wBg}padding:.22rem .25rem;text-align:right;font-size:.65rem;${c?'color:'+c:''}${b?';font-weight:700':''}">${v}</div></td>`
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="${stickyTd}">${r.day}(${r.dow})</td>
       ${cell(N(r.gross))}${cell(N(r.gross_work))}${cell(r.disc>0?N(r.disc):'0','#c62828')}
