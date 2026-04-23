@@ -2459,7 +2459,48 @@ async function ownerSelectDay(ds){
 // ルームボタンから直接ルーム割り当て（承認待ちシフトに対して）
 // 仮ルーム選択（ボタン押下時）
 const _tempRoomMap = {}
+
+// ルーム表をリアルタイム更新（承認済み＋仮選択中を合わせて表示）
+function refreshOwnerRoomGrid(){
+  const ownerRoomGrid = document.getElementById('owner-shift-room-grid')
+  if(!ownerRoomGrid) return
+  const todayStr = today()
+  const approved = ownerShiftData.approved || []
+  const pending  = ownerShiftData.pending  || []
+  const todayApproved = approved.filter(s => s.date === todayStr)
+  const rm = {}
+  todayApproved.forEach(s => {
+    if(s.room){ if(!rm[s.room]) rm[s.room]=[]; rm[s.room].push(s) }
+  })
+  // 仮選択中のものを上書き追加（同じshiftIdがapprovedにあれば除外）
+  Object.entries(_tempRoomMap).forEach(([sid, roomName]) => {
+    const s = pending.find(p => String(p.id) === String(sid))
+    if(!s || s.date !== todayStr) return
+    if(!rm[roomName]) rm[roomName] = []
+    // 仮表示用のオブジェクト（名前と時間だけ）
+    rm[roomName].push({_temp:true, casts:{name:(s.casts?.name||'?')}, start_time:s.start_time, end_time:s.end_time})
+  })
+  let rh = ''
+  ROOMS.forEach(r => {
+    const ss = rm[r]
+    const rc = getRoomColor(r)
+    if(ss && ss.length){
+      const names = ss.map(s => {
+        const nameStr = s.casts?.name || '?'
+        const timeStr = (s.start_time?.slice(0,5)||'') + '〜' + (s.end_time?.slice(0,5)||'')
+        const tempMark = s._temp ? '<span style="font-size:.55rem;color:'+rc.tx+';opacity:.7"> (仮)</span>' : ''
+        return `<div style="font-size:${ss.length>1?'.78rem':'.85rem'};font-weight:700;color:${rc.tx}">${nameStr}${tempMark}<span style="font-size:.58rem;font-weight:400;margin-left:.25rem">${timeStr}</span></div>`
+      }).join('')
+      rh += `<div class="room-card" style="background:${rc.card};border-color:${rc.bd}"><div class="room-lbl" style="color:${rc.tx}">${r}</div>${names}</div>`
+    } else {
+      rh += `<div class="room-card"><div class="room-lbl">${r}</div><div class="room-empty">空き</div></div>`
+    }
+  })
+  ownerRoomGrid.innerHTML = rh
+}
+
 function selectRoomTemp(shiftId, roomName){
+  // 同じシフトが別のルームに仮選択済みなら除去
   _tempRoomMap[shiftId] = roomName
   const lbl = document.getElementById('room-selected-'+shiftId)
   if(lbl) lbl.textContent = '▶ ' + roomName + ' を選択中'
@@ -2473,6 +2514,8 @@ function selectRoomTemp(shiftId, roomName){
   })
   const confirmBtn = document.getElementById('rb-confirm-'+shiftId)
   if(confirmBtn) confirmBtn.style.display='block'
+  // ルーム表をリアルタイム更新
+  refreshOwnerRoomGrid()
 }
 
 async function confirmRoomAssign(shiftId){
