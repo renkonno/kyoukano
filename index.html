@@ -1057,6 +1057,7 @@ async function doCastLogin(){
   err.textContent=''
   if(!cid){err.textContent='名前を選んでください';return}
   if(pin.length<1||pin.length>8){err.textContent='PINは1〜8桁で入力してください';return}
+  const btn=document.getElementById('btn-cast')
   btn.disabled=true; btn.textContent='確認中...'
   const{data:c,error}=await sb.from('casts').select('*').eq('id',cid).eq('pin',pin).single()
   btn.disabled=false; btn.textContent='ログイン'
