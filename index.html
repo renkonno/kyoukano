@@ -4647,7 +4647,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     if(r.noData) return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
       <td style="${stickyTd}">${r.day}(${r.dow})</td><td colspan="11" style="text-align:right;padding:.2rem;font-size:.6rem">—</td></tr>`
     // 数字セルに白背景ボックスをつける
-    const cell=(v,c='',b=false)=>`<td style="padding:.2rem .12rem"><div style="${wBg}padding:.22rem .25rem;text-align:right;font-size:.65rem;${c?'color:'+c:''}${b?';font-weight:700':''}">${v}</div></td>`
+    const cell=(v,c='',b=false)=>`<td style="padding:.2rem .12rem"><div style="${wBg}padding:.22rem .25rem;text-align:center;font-size:.65rem;${c?'color:'+c:''}${b?';font-weight:700':''}">${v}</div></td>`
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="${stickyTd}">${r.day}(${r.dow})</td>
       ${cell(N(r.gross))}${cell(N(r.gross_work))}${cell(r.disc>0?N(r.disc):'0','#c62828')}
