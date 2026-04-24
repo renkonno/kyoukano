@@ -1642,6 +1642,7 @@ async function deleteVisit(visitId,custId){
   const{error}=await sb.from('customer_visits').delete().eq('id',visitId)
   if(error){toast('エラー: '+error.message);return}
   toast('削除しました')
+  monthlyCachedData=null
   openCustomerDetail(custId)
 }
 
@@ -3722,14 +3723,10 @@ async function loadOwnerSalary(){
   const{data:castList3}=await sb.from('casts').select('id,name')
   const getName3=id=>{const c=(castList3||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
   const works=(worksRaw||[]).map(w=>({...w,casts:{name:getName3(w.cast_id)}}))
+  const _setKpi=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v}
   if(!works||!works.length){
-    document.getElementById('o-gross')&&(document.getElementById('o-gross').textContent='¥0')
-    document.getElementById('o-disc')&&(document.getElementById('o-disc').textContent='¥0')
-    document.getElementById('o-sales').textContent='¥0'
-    document.getElementById('o-back').textContent='¥0'
-    document.getElementById('o-count').textContent='0件'
-    document.getElementById('o-cash').textContent='¥0'
-    document.getElementById('o-card').textContent='¥0'
+    _setKpi('o-gross','¥0');_setKpi('o-disc','¥0');_setKpi('o-sales','¥0')
+    _setKpi('o-back','¥0');_setKpi('o-count','0件');_setKpi('o-cash','¥0');_setKpi('o-card','¥0')
     area.innerHTML='<div class="empty">この月の記録はまだありません</div>'
     return
   }
@@ -3748,12 +3745,9 @@ async function loadOwnerSalary(){
   const grossSalesKpi=totalSales+totalDiscAll2
   const totalMisc=works.reduce((s,w)=>s+(w.misc||0),0)
   const totalGrossProfit2=totalSales-totalNet
-  document.getElementById('o-gross')&&(document.getElementById('o-gross').textContent=fmt(grossSalesKpi))
-  document.getElementById('o-disc')&&(document.getElementById('o-disc').textContent=totalDiscAll2>0?'-'+fmt(totalDiscAll2):'¥0')
-  document.getElementById('o-sales').textContent=fmt(totalSales)
-  document.getElementById('o-back').textContent=fmt(totalNet)
-  document.getElementById('o-cash').textContent=fmt(totalMisc)
-  document.getElementById('o-card').textContent=fmt(totalGrossProfit2)
+  _setKpi('o-gross',fmt(grossSalesKpi));_setKpi('o-disc',totalDiscAll2>0?'-'+fmt(totalDiscAll2):'¥0')
+  _setKpi('o-sales',fmt(totalSales));_setKpi('o-back',fmt(totalNet))
+  _setKpi('o-cash',fmt(totalMisc));_setKpi('o-card',fmt(totalGrossProfit2))
 
   const bycast={}
   works.forEach(w=>{
@@ -3825,6 +3819,7 @@ async function deleteWork(id){
   if(!confirm('この記録を削除しますか？'))return
   await sb.from('works').delete().eq('id',id)
   toast('削除しました')
+  monthlyCachedData=null
   loadOwnerSalary()
 }
 
@@ -4100,24 +4095,25 @@ async function openRvDetail(rvId, shiftId, castName){
         </div>`).join('')
       }
 
-      // ④ 来店履歴（キャストは自分の施術分のみ・店舗は全件）
-      let visitQuery = sb.from('customer_visits')
+      // ④ 来店履歴（全件取得・自分以外は名前と内容を伏せる）
+      const {data:visits} = await sb.from('customer_visits')
         .select('visit_date,cast_name,shimei_type,course,options')
         .eq('customer_id',custData.id)
         .order('visit_date',{ascending:false})
         .limit(10)
-      if(!me.is_owner){
-        visitQuery = visitQuery.eq('cast_name', me.name)
-      }
-      const {data:visits} = await visitQuery
       const realVisits = (visits||[]).filter(v=>v.course||v.shimei_type)
       if(realVisits.length){
-        visitHtml = `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">📅 来店履歴${me.is_owner?'（全キャスト）':'（自分の施術のみ）'}</div>`
-        visitHtml += realVisits.map(v=>`<div style="border-left:3px solid var(--accent);padding:.25rem .5rem;margin-bottom:.2rem;font-size:.78rem">
+        visitHtml = `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">📅 来店履歴</div>`
+        visitHtml += realVisits.map(v=>{
+          const isMine = v.cast_name === me.name
+          const dispName = me.is_owner ? (v.cast_name||'?') : (isMine ? me.name : '他キャスト')
+          const dispDetail = (isMine||me.is_owner) ? [v.shimei_type,v.course,v.options].filter(Boolean).join(' / ') : '---'
+          return `<div style="border-left:3px solid ${isMine?'var(--accent)':'var(--border)'};padding:.25rem .5rem;margin-bottom:.2rem;font-size:.78rem">
           <span style="font-weight:600">${v.visit_date||''}</span>
-          ${me.is_owner&&v.cast_name?`<span style="font-size:.65rem;color:var(--text3);margin-left:.3rem">${v.cast_name}</span>`:''}
-          <div style="color:var(--text3);font-size:.72rem">${[v.shimei_type,v.course,v.options].filter(Boolean).join(' / ')}</div>
-        </div>`).join('')
+          <span style="font-size:.65rem;color:${isMine?'var(--accent)':'var(--text3)'};margin-left:.3rem">${dispName}</span>
+          <div style="color:var(--text3);font-size:.72rem">${dispDetail}</div>
+        </div>`
+        }).join('')
       }
     }
   }
@@ -4179,6 +4175,7 @@ async function deleteRv(rvId){
   const{error}=await sb.from('reservations').delete().eq('id',rvId)
   if(error){toast('削除エラー: '+error.message);return}
   toast('削除しました')
+  monthlyCachedData=null
   closeSheet('rv-detail')
   // 予約確認シートを再読み込み
   const body=document.getElementById('shift-reservations-body')
