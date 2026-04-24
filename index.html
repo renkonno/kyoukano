@@ -4104,9 +4104,11 @@ async function openRvDetail(rvId, shiftId, castName){
       const realVisits = (visits||[]).filter(v=>v.course||v.shimei_type)
       if(realVisits.length){
         visitHtml = `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">📅 来店履歴</div>`
+        // 表示名の判定: オーナーは全員の名前を表示、キャストは自分のシフトのcastName(=currentRvCastName)と一致するもののみ自分と表示
+        const viewerName = me.is_owner ? null : (currentRvCastName || me.name)
         visitHtml += realVisits.map(v=>{
-          const isMine = v.cast_name === me.name
-          const dispName = me.is_owner ? (v.cast_name||'?') : (isMine ? me.name : '他キャスト')
+          const isMine = !viewerName || v.cast_name === viewerName
+          const dispName = me.is_owner ? (v.cast_name||'?') : (isMine ? v.cast_name : '他キャスト')
           const dispDetail = [v.shimei_type,v.course,v.options].filter(Boolean).join(' / ')
           return `<div style="border-left:3px solid ${isMine?'var(--accent)':'var(--border)'};padding:.25rem .5rem;margin-bottom:.2rem;font-size:.78rem">
           <span style="font-weight:600">${v.visit_date||''}</span>
@@ -4493,8 +4495,9 @@ async function renderMonthlyContent(){
     const dp=discs2.reduce((s,n)=>{const d=(discListAll||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
     const total=cp+sp+op-dp
     const payCourse=pj.course||'現金',payShimei=pj.shimei||'現金',payOpt=pj.option||'現金'
-    const card=(payCourse==='カード'?cp:0)+(payShimei==='カード'?sp:0)+(payOpt==='カード'?op:0)
-    return {total,card,cash:total-card,shimei:r.shimei_type||'フリー',isNew:!!(r.is_new===true||r.is_new==='true')}
+    const cardBase=(payCourse==='カード'?cp:0)+(payShimei==='カード'?sp:0)+(payOpt==='カード'?op:0)
+    const card=cardBase>0?Math.ceil(cardBase*1.1):0
+    return {total,card,cardBase,cash:total-cardBase,shimei:r.shimei_type||'フリー',isNew:!!(r.is_new===true||r.is_new==='true')}
   }
 
   const shiftDateMap={},shiftCastMap={}
@@ -4527,9 +4530,9 @@ async function renderMonthlyContent(){
     const misc=dayWorks.reduce((s,w)=>s+(w.misc||0),0)
     const count=dayWorks.reduce((s,w)=>s+(w.count||0),0)
     const disc=dayWorks.reduce((s,w)=>s+((w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)),0)
-    let card=0,cash=0,rvFree=0,rvNet=0,rvHon=0,newCount=0,repeatCount=0
-    dayRvs.forEach(r=>{const am=calcRv(r);card+=am.card;cash+=am.cash;if(am.shimei==='フリー')rvFree++;else if(am.shimei==='ネット指名')rvNet++;else if(am.shimei==='本指名')rvHon++;if(am.isNew)newCount++;else repeatCount++})
-    const cardFee=Math.floor(card*0.06)+80
+    let card=0,cardBase=0,cash=0,rvFree=0,rvNet=0,rvHon=0,newCount=0,repeatCount=0
+    dayRvs.forEach(r=>{const am=calcRv(r);card+=am.card;cardBase+=am.cardBase||0;cash+=am.cash;if(am.shimei==='フリー')rvFree++;else if(am.shimei==='ネット指名')rvNet++;else if(am.shimei==='本指名')rvHon++;if(am.isNew)newCount++;else repeatCount++})
+    const cardFee=cardBase>0?Math.floor(cardBase*0.06)+80:0
     const profit=gross_work-net-misc
     dailyRows.push({day,dow,dateStr,gross:gross_work+disc,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
   }
