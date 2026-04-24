@@ -4019,8 +4019,8 @@ async function openShiftReservations(shiftId, castName){
         <div style="font-size:.6rem;color:#1565c0;font-weight:700;margin-bottom:.2rem">💳 カード内訳</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;text-align:center">
           <div><div style="font-size:.58rem;color:#555">カード金額</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div></div>
+          <div><div style="font-size:.58rem;color:#555">お客請求(10%)</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(Math.ceil(cardAmt*1.1))}</div></div>
           <div><div style="font-size:.58rem;color:#555">手数料(6%+80円)</div><div style="font-size:.78rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.06)+80)}</div></div>
-          <div><div style="font-size:.58rem;color:#555">手数料込合計</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(cardAmt+Math.floor(cardAmt*0.06)+80)}</div></div>
         </div>
       </div>`:''}
       ${r.note?`<div style="font-size:.75rem;color:var(--text3)">📝 ${r.note}</div>`:''}
@@ -4107,7 +4107,7 @@ async function openRvDetail(rvId, shiftId, castName){
         visitHtml += realVisits.map(v=>{
           const isMine = v.cast_name === me.name
           const dispName = me.is_owner ? (v.cast_name||'?') : (isMine ? me.name : '他キャスト')
-          const dispDetail = (isMine||me.is_owner) ? [v.shimei_type,v.course,v.options].filter(Boolean).join(' / ') : '---'
+          const dispDetail = [v.shimei_type,v.course,v.options].filter(Boolean).join(' / ')
           return `<div style="border-left:3px solid ${isMine?'var(--accent)':'var(--border)'};padding:.25rem .5rem;margin-bottom:.2rem;font-size:.78rem">
           <span style="font-weight:600">${v.visit_date||''}</span>
           <span style="font-size:.65rem;color:${isMine?'var(--accent)':'var(--text3)'};margin-left:.3rem">${dispName}</span>
@@ -4139,8 +4139,8 @@ async function openRvDetail(rvId, shiftId, castName){
         <div style="font-size:.62rem;color:#1565c0;font-weight:700;margin-bottom:.25rem">💳 カード内訳</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;text-align:center">
           <div><div style="font-size:.6rem;color:#555">カード金額</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div></div>
+          <div><div style="font-size:.6rem;color:#555">お客請求(10%)</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(Math.ceil(cardAmt*1.1))}</div></div>
           <div><div style="font-size:.6rem;color:#555">手数料(6%+80円)</div><div style="font-size:.85rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.06)+80)}</div></div>
-          <div><div style="font-size:.6rem;color:#555">手数料込合計</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(cardAmt+Math.floor(cardAmt*0.06)+80)}</div></div>
         </div>
       </div>`:''}
       <div class="fee-sec">
