@@ -1270,7 +1270,7 @@ function renderCal(){
     const ds=calMonth+'-'+String(d).padStart(2,'0')
     const s=sm[ds]; const isPast=ds<td
     const dow=new Date(ds).getDay()
-    let bg='',border='',color='',fontWeight='500'
+    let bg='',border='',color='',fontWeight='500',isToday=false
     if(!isPast){
       if(s){
         if(s.status==='requested'){bg='var(--bbg)';border='1.5px solid var(--bbd)';color='var(--btx)'}
@@ -1278,15 +1278,16 @@ function renderCal(){
         else{bg='var(--rbg)';border='1.5px solid var(--rbd)';color='var(--rtx)';fontWeight='400'}
       }
       if(ds===selectedDate){bg='var(--accent-f)';border='1.5px solid var(--accent)';color='var(--accent)';fontWeight='700'}
-      else if(ds===td){border='1.5px solid var(--accent)';color='var(--accent)';fontWeight='700'}
+      else if(ds===td){border='1.5px solid transparent';color='#fff';fontWeight='800';isToday=true}
     }
     if(!color&&!s){color=dow===0?'var(--rtx)':dow===6?'var(--btx)':'var(--text2)'}
     const opacity=isPast?'0.3':''
     const cursor='pointer'
     const onclick='selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'出勤':'却下'):''
-    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.6rem;line-height:1.2">${statusText}</span>`:''}</div>`
-    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
+    const todayCircleHtml=isToday?`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(78%,2rem);height:min(78%,2rem);border-radius:50%;background:var(--accent);z-index:0"></div>`:''
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0;position:relative">${todayCircleHtml}<span style="font-size:1.2rem;font-weight:800;line-height:1.1;position:relative;z-index:1">${d}</span>${statusText?`<span style="font-size:.6rem;line-height:1.2;position:relative;z-index:1">${statusText}</span>`:''}</div>`
+    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;overflow:hidden;padding:0">${inner}</td>`
     col++
   }
   // 残りの空白
@@ -2351,17 +2352,18 @@ async function loadOwnerCal(){
     const hasPending=pendingDates[ds]>0
     const hasApproved=approvedDates[ds]>0
     const dow2=new Date(ds).getDay()
-    let bg2='',border2='',color2=''
-    if(ds===td){border2='1.5px solid var(--accent)';color2='var(--accent)'}
+    let bg2='',border2='',color2='',isToday2=false
+    if(ds===td){border2='1.5px solid transparent';color2='#fff';isToday2=true}
     else if(hasPending){bg2='var(--bbg)';border2='1.5px solid var(--bbd)';color2='var(--btx)'}
     else if(hasApproved){bg2='var(--gbg)';border2='1.5px solid var(--gbd)';color2='var(--gtx)'}
     if(!color2){color2=dow2===0?'var(--rtx)':dow2===6?'var(--btx)':'var(--text2)'}
     const totalShifts=(pendingDates[ds]||0)+(approvedDates[ds]||0)
     const rvCount=reservationByDate[ds]||0
     const statusLabel=totalShifts>0?('出勤'+totalShifts):''
-    const rvLabel=rvCount>0?`<span style="font-size:.6rem;line-height:1.2;color:var(--accent)">予約${rvCount}</span>`:''
-    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusLabel?`<span style="font-size:.6rem;line-height:1.2">${statusLabel}</span>`:''} ${rvLabel}</div>`
-    cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
+    const rvLabel=rvCount>0?`<span style="font-size:.6rem;line-height:1.2;color:${isToday2?'#fff':'var(--accent)'}">予約${rvCount}</span>`:''
+    const todayCircleHtml2=isToday2?`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(78%,2rem);height:min(78%,2rem);border-radius:50%;background:var(--accent);z-index:0"></div>`:''
+    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0;position:relative">${todayCircleHtml2}<span style="font-size:1.2rem;font-weight:800;line-height:1.1;position:relative;z-index:1">${d}</span>${statusLabel?`<span style="font-size:.6rem;line-height:1.2;position:relative;z-index:1">${statusLabel}</span>`:''} ${rvLabel}</div>`
+    cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0;position:relative;overflow:hidden">${inner2}</td>`
     col2++
   }
   while(col2<7&&col2>0){cal+=`<td style="height:${cellSize2}"></td>`;col2++}
