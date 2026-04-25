@@ -4700,9 +4700,15 @@ async function renderMonthlyContent(){
     const op=opts2.reduce((s,n)=>{const o=(optList||[]).find(x=>x.name===n);return s+(o?.price||0)},0)
     const discs2=r.discount?r.discount.split(',').filter(Boolean):[]
     const dp=discs2.reduce((s,n)=>{const d=(discListAll||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
-    const total=cp+sp+op-dp
+    // 延長（extension_count × 延長コース単価）
+    const extCount=r.extension_count||0
+    const extCourseObj=(courseList||[]).find(c=>c.name&&c.name.includes('延長'))
+    const extUnit=extCourseObj?.price||6000
+    const extTotal=extCount*extUnit
+    const payExt=pj.ext||'現金'
+    const total=cp+sp+op+extTotal-dp
     const payCourse=pj.course||'現金',payShimei=pj.shimei||'現金',payOpt=pj.option||'現金'
-    const cardBase=(payCourse==='カード'?cp:0)+(payShimei==='カード'?sp:0)+(payOpt==='カード'?op:0)
+    const cardBase=(payCourse==='カード'?cp:0)+(payShimei==='カード'?sp:0)+(payOpt==='カード'?op:0)+(payExt==='カード'?extTotal:0)
     const card=cardBase>0?Math.ceil(cardBase*1.1):0
     return {total,card,cardBase,cash:total-cardBase,shimei:r.shimei_type||'フリー',isNew:!!(r.is_new===true||r.is_new==='true')}
   }
