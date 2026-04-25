@@ -4612,7 +4612,32 @@ async function renderMonthlyContent(){
     dayRvs.forEach(r=>{const am=calcRv(r);card+=am.card;cardBase+=am.cardBase||0;cash+=am.cash;if(am.shimei==='フリー')rvFree++;else if(am.shimei==='ネット指名')rvNet++;else if(am.shimei==='本指名')rvHon++;if(am.isNew)newCount++;else repeatCount++})
     const cardFee=cardBase>0?Math.floor(cardBase*0.06)+80:0
     const profit=gross_work-net-misc
-    dailyRows.push({day,dow,dateStr,gross:gross_work+disc,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
+    // キャストごとの現金売上・立替金を計算
+    const castRows=dayWorks.map(w=>{
+      const sessions=w.sessions||[]
+      let wCash=0,wCard=0,wCardBase=0
+      sessions.forEach(s=>{
+        const sp=s.sales||0
+        const cback=(s.pay_course==='カード'?(parseFloat(s.course_back)||0):0)
+        const sback=(s.pay_shimei==='カード'?(parseFloat(s.shimei_back)||0):0)
+        const oback=(s.pay_option==='カード'?(parseFloat(s.opt_back)||0):0)
+        const cardBaseS=cback+sback+oback
+        const cardS=cardBaseS>0?Math.ceil(cardBaseS*1.1):0
+        const extCardBase=(s.extensions||[]).filter(e=>e.pay==='カード').reduce((a,e)=>a+(e.price||0),0)
+        const extCard=extCardBase>0?Math.ceil(extCardBase*1.1):0
+        wCardBase+=cardBaseS+extCardBase
+        wCard+=cardS+extCard
+        wCash+=sp-(cardBaseS+extCardBase)
+      })
+      const wNet=w.net||w.back||0
+      const wAdvance=Math.max(0,wNet-wCash)
+      const wCashRemain=wCash-wNet
+      return {castName:w.castName,net:wNet,cash:wCash,card:wCard,cardBase:wCardBase,advance:wAdvance,cashRemain:wCashRemain,count:w.count||0}
+    })
+    const totalCash=castRows.reduce((s,c)=>s+c.cash,0)
+    const totalAdvance=castRows.reduce((s,c)=>s+c.advance,0)
+    const cashRemain=totalCash-net
+    dailyRows.push({day,dow,dateStr,gross:gross_work+disc,gross_work,disc,net,misc,profit,card,cash,cashWork:totalCash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount,advance:totalAdvance,cashRemain,castRows})
   }
 
   const vr=dailyRows.filter(r=>!r.noData)
@@ -4621,10 +4646,12 @@ async function renderMonthlyContent(){
     disc:vr.reduce((s,r)=>s+(r.disc||0),0),net:vr.reduce((s,r)=>s+(r.net||0),0),
     misc:vr.reduce((s,r)=>s+(r.misc||0),0),profit:vr.reduce((s,r)=>s+(r.profit||0),0),
     card:vr.reduce((s,r)=>s+(r.card||0),0),cash:vr.reduce((s,r)=>s+(r.cash||0),0),
+    cashWork:vr.reduce((s,r)=>s+(r.cashWork||0),0),
     cardFee:vr.reduce((s,r)=>s+(r.cardFee||0),0),count:vr.reduce((s,r)=>s+(r.count||0),0),
     attendance:vr.reduce((s,r)=>s+(r.attendance||0),0),free:vr.reduce((s,r)=>s+(r.free||0),0),
     net_shimei:vr.reduce((s,r)=>s+(r.net_shimei||0),0),hon_shimei:vr.reduce((s,r)=>s+(r.hon_shimei||0),0),
     newCount:vr.reduce((s,r)=>s+(r.newCount||0),0),repeatCount:vr.reduce((s,r)=>s+(r.repeatCount||0),0),
+    advance:vr.reduce((s,r)=>s+(r.advance||0),0),cashRemain:vr.reduce((s,r)=>s+(r.cashRemain||0),0),
   }
   tot.avg_unit=tot.count>0?Math.round(tot.gross_work/tot.count):0
 
@@ -4708,40 +4735,100 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
 
 // ── 日別テーブル：白背景セル ──
 function renderMonthlyDaily(area,dailyRows,tot){
-  const N=n=>(n||0).toLocaleString()
-  const wBg='background:#fff;border-radius:6px;'
+  const N=n=>Math.abs(n||0).toLocaleString()
+  const Ns=n=>(n||0).toLocaleString()
+  const M=n=>'¥'+(n||0).toLocaleString()
+  // ヘッダー列定義
   const cols=[
-    {l:'日付',w:'48px',align:'left',sticky:true},
-    {l:'総売上',w:'60px'},{l:'純売上',w:'60px'},{l:'割引',w:'46px'},
-    {l:'委託',w:'52px'},{l:'粗利',w:'52px'},{l:'現金',w:'52px'},
-    {l:'カード',w:'52px',color:'#1565c0'},{l:'件',w:'26px'},
-    {l:'フリー',w:'32px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
+    {l:'日付',w:'44px',align:'left',sticky:true},
+    {l:'総売上',w:'58px'},{l:'純売上',w:'58px'},{l:'現金売上',w:'58px'},
+    {l:'カード',w:'52px',color:'#1565c0'},{l:'手数料',w:'46px',color:'#555'},
+    {l:'委託金',w:'52px'},{l:'立替金',w:'50px',color:'#c62828'},
+    {l:'粗利益',w:'52px'},{l:'現金残',w:'52px'},
+    {l:'客単価',w:'50px'},{l:'出勤',w:'28px'},
+    {l:'フリー',w:'28px'},{l:'ネット',w:'30px'},{l:'本指',w:'28px'},{l:'合計',w:'28px'},{l:'総数',w:'28px'}
   ]
-  const thStyle=(c,i)=>`padding:.3rem ${i===0?.3:.2}rem;text-align:${c.align||'right'};font-size:.63rem;white-space:nowrap;background:#fff;border-bottom:1.5px solid var(--border);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
-  const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thStyle(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
-  const stickyTd=`padding:.2rem .3rem;position:sticky;left:0;background:#faf6f0;font-size:.66rem;font-weight:600;white-space:nowrap;z-index:1`
-  const td=(v,color='',bold=false,extra='')=>`<td style="text-align:right;padding:.2rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}${extra?';'+extra:''}">${v}</td>`
+  const COL=cols.length
+  const thS=(c,i)=>`padding:.28rem ${i===0?'.3rem':'.15rem'};text-align:${c.align||'right'};font-size:.6rem;white-space:nowrap;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:${c.sticky?3:1};${c.sticky?'left:0;':''}${c.color?'color:'+c.color:''}`
+  const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thS(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
+
+  // セル生成
+  const stickyBase='position:sticky;left:0;z-index:1;white-space:nowrap;padding:.18rem .3rem;font-size:.66rem;font-weight:700;'
+  const numCell=(v,color='',bold=false,bg='')=>`<td style="padding:.15rem .1rem"><div style="background:#fff;border-radius:5px;padding:.2rem .22rem;text-align:right;font-size:.63rem;${color?'color:'+color:''}${bold?';font-weight:700':''}${bg?';background:'+bg:''}">${v}</div></td>`
+
   const makeRow=r=>{
-    if(r.noData) return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
-      <td style="${stickyTd}">${r.day}(${r.dow})</td><td colspan="11" style="text-align:right;padding:.2rem;font-size:.6rem">—</td></tr>`
-    // 数字セルに白背景ボックスをつける
-    const cell=(v,c='',b=false)=>`<td style="padding:.2rem .12rem"><div style="${wBg}padding:.22rem .25rem;text-align:center;font-size:.65rem;${c?'color:'+c:''}${b?';font-weight:700':''}">${v}</div></td>`
-    return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="${stickyTd}">${r.day}(${r.dow})</td>
-      ${cell(N(r.gross))}${cell(N(r.gross_work))}${cell(r.disc>0?N(r.disc):'0','#c62828')}
-      ${cell(N(r.net))}${cell(N(r.profit),'',true)}${cell(N(r.cash))}
-      ${cell(N(r.card),'#1565c0')}${cell(r.count||0)}
-      ${cell(r.free||0)}${cell(r.net_shimei||0)}${cell(r.hon_shimei||0)}
-    </tr>`
+    if(r.noData) return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="${stickyBase}background:#faf6f0;color:var(--text3)">${r.day}(${r.dow})</td>
+      <td colspan="${COL-1}" style="text-align:center;font-size:.6rem;color:var(--text3)">—</td></tr>`
+
+    const castRows=r.castRows||[]
+    const hasAdvance=r.advance>0
+    const cashRemainNeg=r.cashRemain<0
+    const rowBg=hasAdvance?'background:rgba(198,40,40,.04);':''
+    const avgUnit=r.count>0?Math.round((r.gross_work||0)/r.count):0
+
+    // 日付行（サマリ）
+    let html=`<tr style="border-bottom:${castRows.length?'none':'1px solid var(--border)'};cursor:pointer;${rowBg}" onclick="this.nextElementSibling&&(this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none')">`
+    html+=`<td style="${stickyBase}background:${hasAdvance?'#fff5f5':'#faf6f0'}">${r.day}(${r.dow})${castRows.length>1?'<span style="font-size:.5rem;color:var(--text3);margin-left:2px">▼</span>':''}</td>`
+    html+=numCell(Ns(r.gross_work))
+    html+=numCell(Ns(r.gross_work))
+    html+=numCell(Ns(r.cashWork||r.cash))
+    html+=numCell(Ns(r.card),'#1565c0')
+    html+=numCell(r.cardFee>0?Ns(r.cardFee):'—','#888')
+    html+=numCell(Ns(r.net),'','',)
+    html+=numCell(hasAdvance?Ns(r.advance):'—',hasAdvance?'#c62828':'#bbb',hasAdvance)
+    html+=numCell(Ns(r.profit),'',true)
+    html+=numCell(cashRemainNeg?('-'+N(r.cashRemain)):(Ns(r.cashRemain)),cashRemainNeg?'#c62828':'')
+    html+=numCell(avgUnit>0?Ns(avgUnit):'—')
+    html+=numCell(r.attendance||0)
+    html+=numCell(r.free||0)
+    html+=numCell(r.net_shimei||0)
+    html+=numCell(r.hon_shimei||0)
+    html+=numCell(r.count||0)
+    html+=numCell((r.free||0)+(r.net_shimei||0)+(r.hon_shimei||0))
+    html+='</tr>'
+
+    // キャスト明細行（複数人いる日のみ展開）
+    if(castRows.length>1){
+      html+=`<tr class="cast-detail-row"><td colspan="${COL}" style="padding:0">`
+      html+=`<table style="width:100%;border-collapse:collapse;background:rgba(0,0,0,.02)">`
+      castRows.forEach(c=>{
+        const cHasAdv=c.advance>0
+        const cCashNeg=c.cashRemain<0
+        html+=`<tr style="border-bottom:1px solid var(--border)">`
+        html+=`<td style="${stickyBase}background:${cHasAdv?'#fff0f0':'rgba(250,246,240,.7)'};font-weight:600;font-size:.62rem;padding:.15rem .3rem .15rem .7rem;min-width:44px">${c.castName}</td>`
+        html+=numCell(Ns(c.cash+c.cardBase))
+        html+=numCell(Ns(c.cash+c.cardBase))
+        html+=numCell(Ns(c.cash))
+        html+=numCell(Ns(c.card),'#1565c0')
+        html+=`<td></td>`
+        html+=numCell(Ns(c.net))
+        html+=numCell(cHasAdv?Ns(c.advance):'—',cHasAdv?'#c62828':'#bbb',cHasAdv)
+        html+=`<td></td>`
+        html+=numCell(cCashNeg?('-'+N(c.cashRemain)):Ns(c.cashRemain),cCashNeg?'#c62828':'')
+        html+=`<td colspan="7"></td>`
+        html+='</tr>'
+      })
+      html+=`</table></td></tr>`
+    }
+    return html
   }
-  const totRow=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.65rem">
-    <td style="padding:.28rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-    ${[N(tot.gross),N(tot.gross_work),(tot.disc>0?N(tot.disc):'0'),N(tot.net),N(tot.profit),N(tot.cash),N(tot.card),tot.count,tot.free,tot.net_shimei,tot.hon_shimei]
-      .map((v,i)=>`<td style="text-align:right;padding:.28rem .18rem${i===4?';font-weight:700':''}${i===6?';color:#1565c0':''}${i===2?';color:#c62828':''}">${v}</td>`).join('')}
+
+  const totRow=`<tr style="background:var(--surface2);border-top:2px solid var(--accent)">
+    <td style="${stickyBase}background:var(--surface2);font-size:.65rem">合計</td>
+    ${[Ns(tot.gross_work),Ns(tot.gross_work),Ns(tot.cashWork||tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
+       tot.advance>0?Ns(tot.advance):'—',Ns(tot.profit),
+       tot.cashRemain<0?('-'+N(tot.cashRemain)):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,(tot.free||0)+(tot.net_shimei||0)+(tot.hon_shimei||0)]
+      .map((v,i)=>`<td style="text-align:right;padding:.22rem .12rem;font-size:.63rem;font-weight:700${i===7?';color:#c62828':i===3?';color:#1565c0':i===6&&tot.advance>0?';color:#c62828':''}">${v}</td>`).join('')}
   </tr>`
-  const legend=`<div style="display:flex;gap:.8rem;font-size:.62rem;color:var(--text3);margin-bottom:.3rem;flex-wrap:wrap"><span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>委=委託金</span></div>`
+
+  const legend=`<div style="display:flex;gap:.6rem;font-size:.6rem;color:var(--text3);margin-bottom:.35rem;flex-wrap:wrap;align-items:center">
+    <span style="display:flex;align-items:center;gap:.2rem"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(198,40,40,.15)"></span>立替あり</span>
+    <span>▼タップでキャスト内訳</span>
+  </div>`
+
   area.innerHTML=legend+`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;min-width:480px">${thead}<tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody></table></div>`
+    <table style="width:100%;border-collapse:collapse;min-width:640px">${thead}<tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody></table></div>`
 }
 
 // ── キャスト成績表：白背景セル ──
