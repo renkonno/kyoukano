@@ -984,6 +984,12 @@ function addMonth(y,d){const[yr,m]=y.split('-').map(Number);const nd=new Date(yr
 function nextYM(y){return addMonth(y,1)}
 function jpDate(s){const[y,m,d]=s.split('-');return parseInt(m)+'月'+parseInt(d)+'日'}
 function today(){const d=new Date();return new Date(d.getTime()+9*60*60*1000).toISOString().slice(0,10)}
+// 営業日判定：0:00〜1:59は前日の営業日扱い（営業時間 11:00〜翌26:00）
+function bizDay(){
+  const jst=new Date(new Date().getTime()+9*60*60*1000)
+  if(jst.getUTCHours()<2){jst.setUTCDate(jst.getUTCDate()-1)}
+  return jst.toISOString().slice(0,10)
+}
 function toast(msg,dur=1800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),dur)}
 function closeSheet(id){
   const el=document.getElementById(id+'-overlay')
@@ -2601,7 +2607,7 @@ async function confirmRoomAssign(shiftId){
   toast(roomName+'に振り分けました')
   loadOwnerCal()
   const shift=(ownerShiftData.pending||[]).find(s=>s.id===shiftId)
-  if(shift&&shift.date===today()){loadToday()}
+  if(shift&&shift.date===bizDay()){loadToday()}
 }
 
 async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
@@ -2633,16 +2639,16 @@ async function deleteShift(){
 // ── 店舗：本日状況 ──
 let todayNavDate=null
 function todayNavMove(d){
-  const base=todayNavDate||today()
+  const base=todayNavDate||bizDay()
   const dt=new Date(base);dt.setDate(dt.getDate()+d)
   todayNavDate=dt.toISOString().slice(0,10)
-  document.getElementById('today-jump-btn').style.display=todayNavDate===today()?'none':''
+  document.getElementById('today-jump-btn').style.display=todayNavDate===bizDay()?'none':''
   loadToday()
 }
 function todayNavReset(){todayNavDate=null;document.getElementById('today-jump-btn').style.display='none';loadToday()}
 async function loadToday(){
-  const td=todayNavDate||today();const[y,m,d]=td.split('-')
-  const isToday2=td===today()
+  const td=todayNavDate||bizDay();const[y,m,d]=td.split('-')
+  const isToday2=td===bizDay()
   document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'+(isToday2?' (今日)':'')
   const{data:shiftsRaw}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
   const{data:castList2}=await sb.from('casts').select('id,name')
@@ -2792,7 +2798,7 @@ let ganttModalRoom=null
 
 function openGanttModal(room){
   ganttModalRoom=room
-  ganttModalDate=todayNavDate||today()
+  ganttModalDate=todayNavDate||bizDay()
   document.getElementById('gantt-modal-title').textContent=room+' のガントチャート'
   _ganttLock()
   // 回転・レイアウト確定後にサイズを取得するため2フレーム待つ
