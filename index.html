@@ -380,6 +380,14 @@ tr:last-child td{border-bottom:none}
           <button class="cal-nav-btn" id="today-jump-btn" onclick="todayNavReset()" style="font-size:.7rem;padding:.2rem .5rem;display:none">今日</button>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem;background:#fff;border-radius:10px;padding:.6rem .8rem;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+        <div style="font-size:.78rem;color:var(--text3);white-space:nowrap">📞 問合せ数</div>
+        <input type="number" id="today-inquiry" min="0" inputmode="numeric" placeholder="0"
+          style="width:4rem;border:1.5px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:1rem;font-weight:700;text-align:center;background:var(--surface2);color:var(--text);font-family:inherit;outline:none"
+          oninput="saveTodayInquiry()">
+        <div style="font-size:.78rem;color:var(--text3)">件</div>
+        <div id="today-inquiry-status" style="font-size:.65rem;color:var(--text3);margin-left:auto"></div>
+      </div>
       <div class="sec">ルーム</div>
       <div class="room-grid" id="room-grid"></div>
       <div class="sec">承認済みシフト</div>
@@ -2638,6 +2646,20 @@ async function deleteShift(){
 
 // ── 店舗：本日状況 ──
 let todayNavDate=null
+let _inqTimer=null
+async function saveTodayInquiry(){
+  const td=todayNavDate||bizDay()
+  const val=parseInt(document.getElementById('today-inquiry').value)||0
+  const st=document.getElementById('today-inquiry-status')
+  if(st) st.textContent='保存中...'
+  clearTimeout(_inqTimer)
+  _inqTimer=setTimeout(async()=>{
+    const{error}=await sb.from('daily_notes').upsert({date:td,inquiry_count:val},{onConflict:'date'})
+    if(st) st.textContent=error?'エラー':'保存済'
+    setTimeout(()=>{if(st)st.textContent=''},2000)
+    monthlyCachedData=null // 日別テーブルのキャッシュクリア
+  },800)
+}
 function todayNavMove(d){
   const base=todayNavDate||bizDay()
   const dt=new Date(base);dt.setDate(dt.getDate()+d)
@@ -2650,6 +2672,13 @@ async function loadToday(){
   const td=todayNavDate||bizDay();const[y,m,d]=td.split('-')
   const isToday2=td===bizDay()
   document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'+(isToday2?' (今日)':'')
+  // 問合せ数を読み込み
+  const inqEl=document.getElementById('today-inquiry')
+  if(inqEl){
+    const{data:inqData}=await sb.from('daily_notes').select('inquiry_count').eq('date',td).maybeSingle()
+    inqEl.value=inqData?.inquiry_count||''
+    document.getElementById('today-inquiry-status').textContent=''
+  }
   const{data:shiftsRaw}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
   const{data:castList2}=await sb.from('casts').select('id,name')
   const getName2=id=>{const c=(castList2||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
@@ -4557,6 +4586,8 @@ async function renderMonthlyContent(){
   }
   const {data:storeRaw}=await sb.from('monthly_sales').select('*').eq('month',monthlyMonth).single()
   const sd=storeRaw||{}
+  const {data:dailyNotesRaw}=await sb.from('daily_notes').select('date,inquiry_count').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01')
+  const inquiryByDate={};(dailyNotesRaw||[]).forEach(n=>{inquiryByDate[n.date]=n.inquiry_count||0})
   const {data:courseList}=await sb.from('courses').select('*')
   const {data:optList}=await sb.from('options').select('*')
   const {data:discListAll}=await sb.from('cast_discounts').select('*').eq('cast_id',0)
@@ -4631,7 +4662,8 @@ async function renderMonthlyContent(){
     const totalCash=castRows.reduce((s,c)=>s+c.cash,0)
     const totalAdvance=castRows.reduce((s,c)=>s+c.advance,0)
     const cashRemain=totalCash-net
-    dailyRows.push({day,dow,dateStr,gross:gross_work+disc,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount,advance:totalAdvance,cashRemain,castRows})
+    const inquiry=inquiryByDate[dateStr]||0
+    dailyRows.push({day,dow,dateStr,gross:gross_work+disc,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance:dayWorks.length,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount,advance:totalAdvance,cashRemain,castRows,inquiry})
   }
 
   const vr=dailyRows.filter(r=>!r.noData)
@@ -4645,6 +4677,7 @@ async function renderMonthlyContent(){
     net_shimei:vr.reduce((s,r)=>s+(r.net_shimei||0),0),hon_shimei:vr.reduce((s,r)=>s+(r.hon_shimei||0),0),
     newCount:vr.reduce((s,r)=>s+(r.newCount||0),0),repeatCount:vr.reduce((s,r)=>s+(r.repeatCount||0),0),
     advance:vr.reduce((s,r)=>s+(r.advance||0),0),cashRemain:vr.reduce((s,r)=>s+(r.cashRemain||0),0),
+    inquiry:vr.reduce((s,r)=>s+(r.inquiry||0),0),
   }
   tot.avg_unit=tot.count>0?Math.round(tot.gross_work/tot.count):0
 
@@ -4770,7 +4803,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     const cashNeg=r.cashRemain<0
     const avgUnit=r.count>0?Math.round((r.gross_work||0)/r.count):0
     const rowBg=hasAdv?'background:rgba(198,40,40,.03)':''
-    const multiCast=castRows.length>1
+    const multiCast=castRows.length>=1
 
     // サマリ行
     const onclickAttr=multiCast?'onclick="toggleCastSub(this)"':'';
@@ -4825,7 +4858,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     <td style="position:sticky;left:0;background:var(--surface2);z-index:1;padding:.25rem .35rem;font-size:.65rem;font-weight:700;border-right:1px solid var(--border)">合計</td>
     ${[Ns(tot.gross_work),Ns(tot.gross_work),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
-       totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,(tot.free||0)+(tot.net_shimei||0)+(tot.hon_shimei||0)]
+       totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
       .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===6&&totAdv?';color:#c62828':i===3?';color:#1565c0':i===8&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
   </tr>`
 
