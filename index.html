@@ -3306,7 +3306,7 @@ function getOptPrice(name){
 }
 
 function calcTotal2(){
-  let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0,totalDisc=0
+  let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0,totalDisc=0,totalCardBase=0,totalCardFee=0
   const blocks=document.querySelectorAll('.session-block')
   const sessionCount=blocks.length
   // 雑費の自動計算
@@ -3351,10 +3351,33 @@ function calcTotal2(){
     })
     // どちらの割引も総売上（客の支払い）は下がる
     // 店落ちから引く→店が負担（店落ちが減る）、委託金から引く→キャストが負担（委託金が減る）
-    const blockSales=coursePrice+shimeiPrice+optSale+extSale-blockDiscShop-blockDiscBack
+    // カード金額（10%上乗せ前の元額）を支払い方法から算出
+    const payCourse2=block.querySelector('.s-pay-course')?.value||'現金'
+    const payShimei2=block.querySelector('.s-pay-shimei')?.value||'現金'
+    const payOpt2=block.querySelector('.s-pay-option')?.value||'現金'
+    let cardBase=0
+    if(payCourse2==='カード') cardBase+=coursePrice-blockDiscShop  // 店落ち割引はカード元額から引く
+    if(payShimei2==='カード') cardBase+=shimeiPrice
+    if(payOpt2==='カード') cardBase+=optSale
+    // 延長のカード
+    let extCardBase=0
+    block.querySelectorAll('.ext-check:checked').forEach((cb,ei)=>{
+      const paySel=block.querySelector('.s-pay-ext-'+(ei+1))
+      if(paySel?.value==='カード') extCardBase+=extPriceUnit
+    })
+    cardBase+=extCardBase
+    // カード手数料（6%+80円、カードがある場合のみ）
+    const blockCardFee=cardBase>0?Math.floor(cardBase*0.06)+80:0
+    // カード10%上乗せ分（お客様請求額への加算）
+    const cardSurcharge=cardBase>0?Math.ceil(cardBase*0.1):0
+    // 実際の売上（お客様請求）= 元売上 + カード10%上乗せ
+    const blockSalesBase=coursePrice+shimeiPrice+optSale+extSale-blockDiscShop-blockDiscBack
+    const blockSales=blockSalesBase+cardSurcharge
     const blockBack=cback+sback+optBack+extBack-blockDiscBack
     totalSales+=blockSales
     totalBack+=blockBack
+    totalCardBase+=cardBase
+    totalCardFee+=blockCardFee
     discFromBack+=blockDiscBack
     discFromShop+=blockDiscShop
     // セッション内訳をリアルタイム表示
@@ -3365,24 +3388,31 @@ function calcTotal2(){
       breakdown.style.cssText='margin-top:.4rem;padding:.4rem .5rem;background:var(--surface2);border-radius:6px;font-size:.75rem'
       block.appendChild(breakdown)
     }
-    // 内訳：全行をgridで統一（項目 / 金額 / 委託金 / 店落ち）
-    const G='display:grid;grid-template-columns:1fr 62px 62px 62px;padding:.15rem 0;border-bottom:1px solid var(--border);align-items:center'
-    const row=(label,price,back)=>{
-      const shop=price-back
+    // 内訳：全行をgridで統一（項目 / お客様請求 / 委託金 / 店落ち）
+    const G='display:grid;grid-template-columns:1fr 68px 62px 62px;padding:.15rem 0;border-bottom:1px solid var(--border);align-items:center'
+    const row=(label,basePrice,back,isCard=false)=>{
+      const billedPrice=isCard?Math.ceil(basePrice*1.1):basePrice
+      const shop=billedPrice-back
       return `<div style="${G}">
-        <span style="color:var(--text3);font-size:.75rem">${label}</span>
-        <span style="text-align:right;font-size:.75rem">${fmt(price)}</span>
+        <span style="color:var(--text3);font-size:.75rem">${label}${isCard?'<span style="font-size:.6rem;color:#1565c0;margin-left:.2rem">C</span>':''}</span>
+        <span style="text-align:right;font-size:.75rem">${fmt(billedPrice)}</span>
         <span style="text-align:right;font-size:.72rem;color:var(--accent)">${fmt(back)}</span>
         <span style="text-align:right;font-size:.72rem;color:var(--text3)">${shop>0?fmt(shop):'-'}</span>
       </div>`
     }
-    let brows=`<div style="display:grid;grid-template-columns:1fr 62px 62px 62px;padding:.1rem 0;font-size:.65rem;color:var(--text3);font-weight:600;border-bottom:1.5px solid var(--border)">
-      <span>項目</span><span style="text-align:right">金額</span><span style="text-align:right">委託金</span><span style="text-align:right">店落ち</span>
+    let brows=`<div style="display:grid;grid-template-columns:1fr 68px 62px 62px;padding:.1rem 0;font-size:.65rem;color:var(--text3);font-weight:600;border-bottom:1.5px solid var(--border)">
+      <span>項目</span><span style="text-align:right">請求額</span><span style="text-align:right">委託金</span><span style="text-align:right">店落ち</span>
     </div>`
-    if(c) brows+=row(c.name,coursePrice,cback)
-    if(shimeiPrice) brows+=row(stype,shimeiPrice,sback)
-    optRows.forEach(o=>{ brows+=row(o.name,o.price,o.back) })
-    if(extSale) brows+=row('延長',extSale,extBack)
+    if(c) brows+=row(c.name,coursePrice,cback,payCourse2==='カード')
+    if(shimeiPrice) brows+=row(stype,shimeiPrice,sback,payShimei2==='カード')
+    optRows.forEach(o=>{ brows+=row(o.name,o.price,o.back,payOpt2==='カード') })
+    if(extSale){
+      let extIsCard=false
+      block.querySelectorAll('.ext-check:checked').forEach((cb,ei)=>{
+        const ps=block.querySelector('.s-pay-ext-'+(ei+1));if(ps?.value==='カード') extIsCard=true
+      })
+      brows+=row('延長',extSale,extBack,extIsCard)
+    }
     block.querySelectorAll('.disc-check:checked').forEach(cb=>{
       const amt=parseInt(cb.dataset.amount)||0
       const isShop=cb.dataset.dtype==='shop'
@@ -3393,8 +3423,16 @@ function calcTotal2(){
         <span style="text-align:right;font-size:.72rem;color:var(--rtx)">${isShop?'-'+fmt(amt):'-'}</span>
       </div>`
     })
-    const sessionShop=blockSales-blockBack
-    brows+=`<div style="display:grid;grid-template-columns:1fr 62px 62px 62px;padding:.25rem 0;margin-top:.15rem;font-weight:700;font-size:.78rem;border-top:1.5px solid var(--border)">
+    if(blockCardFee>0){
+      brows+=`<div style="${G}">
+        <span style="color:#1565c0;font-size:.72rem">└ 決済手数料(6%+80円)</span>
+        <span style="text-align:right;font-size:.72rem;color:#1565c0">-${fmt(blockCardFee)}</span>
+        <span style="text-align:right;font-size:.7rem;color:var(--text3)">-</span>
+        <span style="text-align:right;font-size:.72rem;color:#1565c0">-${fmt(blockCardFee)}</span>
+      </div>`
+    }
+    const sessionShop=blockSales-blockBack-blockCardFee
+    brows+=`<div style="display:grid;grid-template-columns:1fr 68px 62px 62px;padding:.25rem 0;margin-top:.15rem;font-weight:700;font-size:.78rem;border-top:1.5px solid var(--border)">
       <span>小計</span>
       <span style="text-align:right">${fmt(blockSales)}</span>
       <span style="text-align:right;color:var(--accent)">${fmt(blockBack)}</span>
@@ -3405,24 +3443,29 @@ function calcTotal2(){
   const misc=parseInt(document.getElementById('w-misc').value)||0
   const hosho=parseInt(document.getElementById('w-hosho')?.value)||0
   let net=totalBack-misc
-  // 保証：通常の委託金より保証が高い場合、差額を店が負担
   const hoshoApplied=hosho>0&&net<hosho
   if(hoshoApplied) net=hosho
-  const shopDrop=totalSales-net-discFromShop
+  // 純利益 = 売上(10%込み) - 委託金 - 決済手数料
+  const shopDrop2=totalSales-net-totalCardFee
   let bd=''
-  const grossSales=totalSales+(discFromBack+discFromShop)  // 割引前の総売上
-  const shopDrop2=totalSales-net  // 粗利益（純売上 - 委託金）
-  bd+=`<div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(grossSales)}</span></div>`
+  const grossSales=totalSales+(discFromBack+discFromShop)
   const totalDiscAll=discFromBack+discFromShop
+  bd+=`<div class="sal-row"><span class="sal-rl">売上（お客様請求）</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
+  if(totalCardBase>0){
+    bd+=`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:var(--text3)">└ 現金</span><span class="sal-rv" style="font-size:.78rem">${fmt(totalSales-Math.ceil(totalCardBase*1.1))}</span></div>`
+    bd+=`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:#1565c0">└ カード請求(10%込)</span><span class="sal-rv" style="font-size:.78rem;color:#1565c0">${fmt(Math.ceil(totalCardBase*1.1))}</span></div>`
+  }
   if(totalDiscAll>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(totalDiscAll)}</span></div>`
-  bd+=`<div class="sal-row"><span class="sal-rl" style="font-weight:700">純売上高</span><span class="sal-rv tot">${fmt(totalSales)}</span></div>`
+  bd+=`<div style="border-top:1px dashed var(--border);margin:.2rem 0"></div>`
   if(hoshoApplied){
     bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv" style="color:var(--rtx);font-weight:700">${fmt(net)} <span style="font-size:.72rem">（保証）</span></span></div>`
   } else {
-    bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(net)}</span></div>`
+    bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv neg">-${fmt(net)}</span></div>`
   }
   if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
-  bd+=`<div class="sal-row"><span class="sal-rl" style="font-weight:700">粗利益</span><span class="sal-rv tot">${fmt(shopDrop2)}</span></div>`
+  if(totalCardFee>0) bd+=`<div class="sal-row"><span class="sal-rl" style="color:#1565c0">決済手数料</span><span class="sal-rv neg" style="color:#1565c0">-${fmt(totalCardFee)}</span></div>`
+  bd+=`<div style="border-top:2px solid var(--accent);margin:.25rem 0"></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl" style="font-weight:700;font-size:.9rem">純利益</span><span class="sal-rv tot" style="font-size:.95rem">${fmt(shopDrop2)}</span></div>`
   document.getElementById('w-breakdown').innerHTML=bd
 }
 // 旧calcTotal互換
@@ -3478,16 +3521,26 @@ async function saveWork(){
     // 店落ちからの割引→総売上を下げる、委託金からの割引→委託金を下げる
     const discShop=discounts.filter(d=>d.disc_type==='shop').reduce((s,d)=>s+(d.amount||0),0)
     const discBack=discounts.filter(d=>d.disc_type!=='shop').reduce((s,d)=>s+(d.amount||0),0)
-    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal-discShop-discBack
+    // カード元額を算出してお客様請求額（10%込み）で売上計上
+    let sesCardBase=0
+    if(payCourse==='カード') sesCardBase+=(c.price||0)-discounts.filter(d=>d.disc_type==='shop').reduce((s,d)=>s+d.amount,0)
+    if(payShimei==='カード') sesCardBase+=shimeiPrice
+    if(payOption==='カード') sesCardBase+=optSaleTotal
+    extensions.forEach((e,i)=>{if(e.pay==='カード') sesCardBase+=e.price})
+    const sesCardSurcharge=sesCardBase>0?Math.ceil(sesCardBase*0.1):0
+    const sesCardFee=sesCardBase>0?Math.floor(sesCardBase*0.06)+80:0
+    const sessionSalesBase=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal-discShop-discBack
+    const sessionSales=sessionSalesBase+sesCardSurcharge
     const sessionBack=cback+sback+optBack+extBackTotal-discBack
-    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,card_base:sesCardBase,card_fee:sesCardFee,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
     totalSales+=sessionSales;totalBack+=sessionBack;totalCount++
   })
   const hoshoSave=parseInt(document.getElementById('w-hosho')?.value)||0
   let net=totalBack-misc
   const hoshoAppliedSave=hoshoSave>0&&net<hoshoSave
   if(hoshoAppliedSave) net=hoshoSave
-  const shopDrop=totalSales-net-discFromShop
+  const totalCardFeeW=sessions.reduce((s,ss)=>s+(ss.card_fee||0),0)
+  const shopDrop=totalSales-net-totalCardFeeW
   // hosho はカラムが存在しない可能性があるため sessions の metadata に格納
   const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,shop_drop:shopDrop,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
   // hoshoがある場合はsessionsのメタ情報として保存（works.hoshoカラムがあれば別途試みる）
