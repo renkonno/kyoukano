@@ -2613,9 +2613,19 @@ async function confirmRoomAssign(shiftId){
   if(error){toast('エラー: '+error.message);return}
   delete _tempRoomMap[shiftId]
   toast(roomName+'に振り分けました')
-  loadOwnerCal()
-  const shift=(ownerShiftData.pending||[]).find(s=>s.id===shiftId)
+  // _tempRoomMapの他キャスト分を消さないようloadOwnerCalは呼ばずroomGridだけ更新
+  // ownerShiftDataのpendingからapprovedに移す（再取得なしで即時反映）
+  const shift=(ownerShiftData.pending||[]).find(s=>Number(s.id)===Number(shiftId))
+  if(shift){
+    shift.status='approved'; shift.room=roomName
+    if(!ownerShiftData.approved) ownerShiftData.approved=[]
+    ownerShiftData.approved.push(shift)
+    ownerShiftData.pending=ownerShiftData.pending.filter(s=>Number(s.id)!==Number(shiftId))
+  }
+  refreshOwnerRoomGrid()
   if(shift&&shift.date===bizDay()){loadToday()}
+  // バックグラウンドでカレンダーも更新（ルーム表には影響しない）
+  setTimeout(()=>loadOwnerCal(),2000)
 }
 
 async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
@@ -4162,9 +4172,13 @@ async function openRvDetail(rvId, shiftId, castName){
   const shimeiPrice = r.shimei_type==='フリー'?(ss.shimei_free||0):r.shimei_type==='ネット指名'?(ss.shimei_net||1000):r.shimei_type==='本指名'?(ss.shimei_hon||2000):0
   const optTotal = opts.reduce((s,n)=>{const o=(optList||[]).find(x=>x.name===n);return s+(o?.price||0)},0)
   const discTotal = discs.reduce((s,n)=>{const d=(discListAll||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
-  const totalPrice = coursePrice+shimeiPrice+optTotal-discTotal
-  const payCourse=pj.course||'現金', payShimei=pj.shimei||'現金', payOpt=pj.option||'現金'
-  const cardAmt=(payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)
+  const extCount=r.extension_count||0
+  const extCourseObj=(courseList||[]).find(c=>c.name&&c.name.includes('延長'))
+  const extUnitPrice=extCourseObj?.price||6000
+  const extTotal=extCount*extUnitPrice
+  const totalPrice = coursePrice+shimeiPrice+optTotal+extTotal-discTotal
+  const payCourse=pj.course||'現金', payShimei=pj.shimei||'現金', payOpt=pj.option||'現金', payExt=pj.ext||'現金'
+  const cardAmt=(payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)+(payExt==='カード'?extTotal:0)
   const cashAmt=totalPrice-cardAmt
 
   // ② 接客メモ取得（顧客番号がある場合）
@@ -4259,6 +4273,7 @@ async function openRvDetail(rvId, shiftId, castName){
         <div class="fee-row"><div class="fee-lbl">指名区分</div><div>${r.shimei_type||'-'} <span style="font-size:.72rem;color:${payShimei==='カード'?'#1565c0':'var(--text3)'}">(${payShimei})</span></div></div>
         <div class="fee-row"><div class="fee-lbl">コース</div><div>${r.course||'-'} <span style="font-size:.72rem;color:${payCourse==='カード'?'#1565c0':'var(--text3)'}">(${payCourse})</span></div></div>
         ${opts.length?`<div class="fee-row"><div class="fee-lbl">オプション</div><div>${opts.join('・')} <span style="font-size:.72rem;color:${payOpt==='カード'?'#1565c0':'var(--text3)'}">(${payOpt})</span></div></div>`:''}
+        ${extCount>0?`<div class="fee-row"><div class="fee-lbl">延長</div><div>${extCount}回（${fmt(extTotal)}） <span style="font-size:.72rem;color:${payExt==='カード'?'#1565c0':'var(--text3)'}">(${payExt})</span></div></div>`:''}
         ${discs.length?`<div class="fee-row"><div class="fee-lbl">割引</div><div style="color:var(--rtx)">-${fmt(discTotal)}（${discs.join('・')}）</div></div>`:''}
         ${r.note?`<div class="fee-row"><div class="fee-lbl">備考</div><div>${r.note}</div></div>`:''}
       </div>
@@ -4358,6 +4373,20 @@ async function openRvEdit(rvId){
         </div>
       </div>`:''}
       ${discItems?`<div><div class="fi-lbl">割引</div>${discItems}</div>`:''}
+      <div>
+        <div class="fi-lbl">延長（30分単位）</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;align-items:center">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            ${[1,2,3].map(n=>`<label style="display:flex;align-items:center;gap:.3rem;font-size:.88rem;padding:.25rem .5rem;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface2)">
+              <input type="checkbox" class="rve-ext" value="${n}" ${(r.extension_count||0)>=n?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)"> ${n}回
+            </label>`).join('')}
+          </div>
+          <select class="fi" id="rve-pay-ext" style="width:80px;align-self:flex-start">
+            <option value="現金" ${(pj.ext||'現金')==='現金'?'selected':''}>💴現金</option>
+            <option value="カード" ${pj.ext==='カード'?'selected':''}>💳カード</option>
+          </select>
+        </div>
+      </div>
       <div><div class="fi-lbl">備考</div><input class="fi" id="rve-note" value="${r.note||''}"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.3rem">
         <button class="btn btn-gold" onclick="saveRvEdit(${r.id})">💾 保存する</button>
@@ -4379,8 +4408,11 @@ async function saveRvEdit(rvId){
   const payCourse=document.getElementById('rve-pay-course')?.value||'現金'
   const payShimei=document.getElementById('rve-pay-shimei')?.value||'現金'
   const payOpt=document.getElementById('rve-pay-opt')?.value||'現金'
+  const payExt=document.getElementById('rve-pay-ext')?.value||'現金'
+  const extChecked=[...document.querySelectorAll('.rve-ext:checked')].map(c=>parseInt(c.value))
+  const extCount=extChecked.length>0?Math.max(...extChecked):0
   const note=document.getElementById('rve-note').value.trim()
-  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOpt})
+  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOpt,ext:payExt})
   const{error}=await sb.from('reservations').update({
     customer_name:name,
     customer_no:custNo?parseInt(custNo)||null:null,
@@ -4392,7 +4424,8 @@ async function saveRvEdit(rvId){
     checkin_time:checkin||null,
     checkout_time:checkout||null,
     payment,
-    note
+    note,
+    extension_count:extCount
   }).eq('id',rvId)
   if(error){toast('保存エラー: '+error.message);return}
   toast('保存しました！')
