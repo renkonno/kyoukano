@@ -4882,7 +4882,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
   // 0:日付 1:総売上 2:純売上 3:現金売上 4:カード 5:手数料 6:委託金 7:立替金 8:粗利益 9:現金残 10:客単価 11:出勤 12:フリー 13:ネット 14:本指 15:合計 16:総数
   const cols=[
     {l:'日付',w:'46px',align:'left',sticky:true},
-    {l:'総売上',w:'56px'},{l:'純売上',w:'56px'},{l:'現金売上',w:'56px'},
+    {l:'総売上',w:'56px'},{l:'割引',w:'44px',color:'#c62828'},{l:'純売上',w:'56px'},{l:'現金売上',w:'56px'},
     {l:'カード',w:'56px',color:'#1565c0'},{l:'手数料',w:'46px',color:'#777'},
     {l:'委託金',w:'54px'},{l:'立替金',w:'50px',color:'#c62828'},
     {l:'粗利益',w:'54px'},{l:'現金残',w:'54px'},
@@ -4918,6 +4918,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     let html=`<tr style="border-bottom:1px solid var(--border);${rowBg}${multiCast?';cursor:pointer':''}" ${onclickAttr}>`
     html+=Dsticky(r.day+'('+r.dow+')'+(multiCast?'▾':''),hasAdv?'#fff5f5':'#faf6f0')
     html+=C(Ns(r.gross))
+    html+=C(r.disc>0?'-'+Ns(r.disc):'—',r.disc>0?'#c62828':'#ccc')
     html+=C(r.disc>0?Ns(r.gross_work):Ns(r.gross))
     html+=C(Ns(r.cash))
     html+=C(Ns(r.card),'#1565c0')
@@ -4943,8 +4944,9 @@ function renderMonthlyDaily(area,dailyRows,tot){
         const cbg=cAdv?'#fff0f0':'rgba(250,246,240,.8)'
         html+=`<tr class="cast-sub" style="border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)">`
         html+=Dcast(c.castName,cbg)
-        html+=C(Ns(c.cash+c.cardBase))  // 総売上（キャスト個別は割引考慮済）
-        html+=C(Ns(c.cash+c.cardBase))  // 純売上
+        html+=C(Ns(c.gross||c.cash+c.cardBase))  // 総売上（割引前）
+        html+=C(c.disc>0?'-'+Ns(c.disc):'—',c.disc>0?'#c62828':'#ccc')  // 割引
+        html+=C(Ns(c.sales||c.cash+c.cardBase))  // 純売上（割引後）
         html+=C(Ns(c.cash))             // 現金売上
         html+=C(Ns(c.card),'#1565c0')  // カード
         html+=C('—','#ccc')            // 手数料（キャスト個別は省略）
@@ -4952,7 +4954,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
         html+=C(cAdv?Ns(c.advance):'—',cAdv?'#c62828':'#ccc',cAdv) // 立替金
         html+=C('—','#ccc')            // 粗利益（店合計で管理）
         html+=C(cNeg?'▲'+N(c.cashRemain):Ns(c.cashRemain),cNeg?'#c62828':'') // 現金残
-        html+=`<td colspan="7"></td>`
+        html+=`<td colspan="8"></td>`
         html+='</tr>'
       })
     }
@@ -4964,7 +4966,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
   const totCashNeg=tot.cashRemain<0
   const totRow=`<tr style="background:var(--surface2);border-top:2px solid var(--accent)">
     <td style="position:sticky;left:0;background:var(--surface2);z-index:1;padding:.25rem .35rem;font-size:.65rem;font-weight:700;border-right:1px solid var(--border)">合計</td>
-    ${[Ns(tot.gross),Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
+    ${[Ns(tot.gross),tot.disc>0?'-'+Ns(tot.disc):'—',Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
        totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
       .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===2?';color:#c62828':i===7&&totAdv?';color:#c62828':i===4?';color:#1565c0':i===9&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
