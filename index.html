@@ -4949,23 +4949,29 @@ function renderMonthlyDaily(area,dailyRows,tot){
 
     // キャスト内訳行（同じ <tbody> 内に直接展開→列が揃う）
     if(multiCast){
-      castRows.forEach(c=>{
+      // キャストごとに交互カラー
+      const castBgPalette=['#f0f7ff','#f5fff0','#fff8f0','#f9f0ff','#f0fffc','#fff0f5']
+      castRows.forEach((c,ci)=>{
         const cAdv=c.advance>0
         const cNeg=c.cashRemain<0
-        const cbg=cAdv?'#fff0f0':'rgba(250,246,240,.8)'
-        html+=`<tr class="cast-sub" style="display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)">`
-        html+=Dcast(c.castName,cbg)
-        html+=C(Ns(c.gross||c.cash+c.cardBase))  // 総売上（割引前）
-        html+=C(c.disc>0?'-'+Ns(c.disc):'—',c.disc>0?'#c62828':'#ccc')  // 割引
-        html+=C(Ns(c.sales||c.cash+c.cardBase))  // 純売上（割引後）
-        html+=C(Ns(c.cash))             // 現金売上
-        html+=C(Ns(c.card),'#1565c0')  // カード
-        html+=C('—','#ccc')            // 手数料（キャスト個別は省略）
-        html+=C(Ns(c.net))             // 委託金
-        html+=C(cAdv?Ns(c.advance):'—',cAdv?'#c62828':'#ccc',cAdv) // 立替金
-        html+=C('—','#ccc')            // 粗利益（店合計で管理）
-        html+=C(cNeg?'▲'+N(c.cashRemain):Ns(c.cashRemain),cNeg?'#c62828':'') // 現金残
-        html+=`<td colspan="8"></td>`
+        const baseBg=cAdv?'#fff0f0':castBgPalette[ci%castBgPalette.length]
+        const accentColor=cAdv?'#c62828':['#1565c0','#2e7d32','#e65100','#6a1b9a','#00695c','#ad1457'][ci%6]
+        html+=`<tr class="cast-sub" style="display:none;border-bottom:1px solid #e0e0e0;border-left:3px solid ${accentColor}">`
+        // 名前セル：アクセントカラーの背景
+        html+=`<td style="position:sticky;left:0;z-index:1;background:${baseBg};padding:.2rem .3rem .2rem 1rem;font-size:.65rem;font-weight:700;white-space:nowrap;border-right:1px solid var(--border);color:${accentColor}">${c.castName}</td>`
+        // 数値セル（baseBg背景）
+        const Cc=(v,color='',bold=false)=>`<td style="padding:.1rem .06rem"><div style="background:${baseBg};border-radius:4px;padding:.18rem .12rem;text-align:center;font-size:.63rem;min-width:0;${color?'color:'+color:''}${bold?';font-weight:700':''}">${v}</div></td>`
+        html+=Cc(Ns(c.gross||c.cash+c.cardBase))
+        html+=Cc(c.disc>0?'-'+Ns(c.disc):'—',c.disc>0?'#c62828':'#bbb')
+        html+=Cc(Ns(c.sales||c.cash+c.cardBase))
+        html+=Cc(Ns(c.cash))
+        html+=Cc(Ns(c.card),'#1565c0')
+        html+=Cc('—','#ccc')
+        html+=Cc(Ns(c.net),'',true)
+        html+=Cc(cAdv?Ns(c.advance):'—',cAdv?'#c62828':'#bbb',cAdv)
+        html+=Cc('—','#ccc')
+        html+=Cc(cNeg?'▲'+N(c.cashRemain):Ns(c.cashRemain),cNeg?'#c62828':'')
+        html+=`<td colspan="8" style="background:${baseBg}"></td>`
         html+='</tr>'
       })
     }
