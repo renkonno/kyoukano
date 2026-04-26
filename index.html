@@ -4773,7 +4773,8 @@ async function renderMonthlyContent(){
       const wDisc=(w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)
       const wSales=w.sales||0
       const wGross=wSales+wDisc
-      const wAdvance=Math.max(0,wNet-wCash)
+      // 売上0（保証のみ）の場合は立替金ではなく委託金として扱う
+      const wAdvance=wSales>0?Math.max(0,wNet-wCash):0
       const wCashRemain=wCash-wNet
       return {castName:w.castName,net:wNet,cash:wCash,card:wCard,cardBase:wCardBase,advance:wAdvance,cashRemain:wCashRemain,count:w.count||0,disc:wDisc,gross:wGross,sales:wSales}
     })
