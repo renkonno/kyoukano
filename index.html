@@ -4749,19 +4749,30 @@ async function renderMonthlyContent(){
     const count=dayWorks.reduce((s,w)=>s+(w.count||0),0)
     const disc=dayWorks.reduce((s,w)=>s+((w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)),0)
     let card=0,cardBase=0,cash=0,rvFree=0,rvNet=0,rvHon=0,newCount=0,repeatCount=0
-    dayRvs.forEach(r=>{const am=calcRv(r);card+=am.card;cardBase+=am.cardBase||0;cash+=am.cash;if(am.shimei==='フリー')rvFree++;else if(am.shimei==='ネット指名')rvNet++;else if(am.shimei==='本指名')rvHon++;if(am.isNew)newCount++;else repeatCount++})
+    const allSessHasCash=dayWorks.some(w=>(w.sessions||[]).some(s=>s.cash!=null))
+    if(allSessHasCash){
+      dayWorks.forEach(w=>{(w.sessions||[]).forEach(s=>{cash+=(s.cash||0);card+=(s.card||0);cardBase+=(s.cardBase||s.card||0)})})
+      dayRvs.forEach(r=>{if(r.shimei_type==='フリー')rvFree++;else if(r.shimei_type==='ネット指名')rvNet++;else if(r.shimei_type==='本指名')rvHon++;if(r.is_new)newCount++;else repeatCount++})
+    } else {
+      dayRvs.forEach(r=>{const am=calcRv(r);card+=am.card;cardBase+=am.cardBase||0;cash+=am.cash;if(am.shimei==='フリー')rvFree++;else if(am.shimei==='ネット指名')rvNet++;else if(am.shimei==='本指名')rvHon++;if(am.isNew)newCount++;else repeatCount++})
+    }
     const cardFee=cardBase>0?Math.floor(cardBase*0.06)+80:0
     const profit=gross_work-net-misc
-    // キャストごとの現金売上・立替金を計算（reservations の calcRv ベース）
+    // キャストごとの現金売上・立替金を計算（sessionsにcash/cardがあれば優先）
     const castRows=dayWorks.map(w=>{
       const dk=dateStr+'|'+w.cast_id
       const wRvs=rvsByDateCast[dk]||[]
       let wCash=0,wCard=0,wCardBase=0
-      wRvs.forEach(r=>{const am=calcRv(r);wCard+=am.card;wCardBase+=am.cardBase||0;wCash+=am.cash})
+      const sessHasCash=(w.sessions||[]).some(s=>s.cash!=null)
+      if(sessHasCash){
+        ;(w.sessions||[]).forEach(s=>{wCash+=(s.cash||0);wCard+=(s.card||0);wCardBase+=(s.cardBase||s.card||0)})
+      } else {
+        wRvs.forEach(r=>{const am=calcRv(r);wCard+=am.card;wCardBase+=am.cardBase||0;wCash+=am.cash})
+      }
       const wNet=w.net||w.back||0
       const wDisc=(w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)
       const wSales=w.sales||0
-      const wGross=wSales+wDisc  // 割引前の総売上
+      const wGross=wSales+wDisc
       const wAdvance=Math.max(0,wNet-wCash)
       const wCashRemain=wCash-wNet
       return {castName:w.castName,net:wNet,cash:wCash,card:wCard,cardBase:wCardBase,advance:wAdvance,cashRemain:wCashRemain,count:w.count||0,disc:wDisc,gross:wGross,sales:wSales}
@@ -4871,7 +4882,7 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
 function toggleCastSub(row){
   let n=row.nextElementSibling
   while(n&&n.classList.contains('cast-sub')){
-    n.style.display=n.style.display===''?'none':''
+    n.style.display=n.style.display==='none'?'':'none'
     n=n.nextElementSibling
   }
 }
@@ -4942,7 +4953,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
         const cAdv=c.advance>0
         const cNeg=c.cashRemain<0
         const cbg=cAdv?'#fff0f0':'rgba(250,246,240,.8)'
-        html+=`<tr class="cast-sub" style="border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)">`
+        html+=`<tr class="cast-sub" style="display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)">`
         html+=Dcast(c.castName,cbg)
         html+=C(Ns(c.gross||c.cash+c.cardBase))  // 総売上（割引前）
         html+=C(c.disc>0?'-'+Ns(c.disc):'—',c.disc>0?'#c62828':'#ccc')  // 割引
