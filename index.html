@@ -1428,6 +1428,14 @@ async function loadShiftList(){
 
 // ── キャスト：委託金確認 ──
 function salMove(d){salMonth=addMonth(salMonth,d);loadMySalary()}
+function salDayToggle(detailId){
+  const el=document.getElementById(detailId)
+  const icon=document.getElementById(detailId+'-icon')
+  if(!el)return
+  const open=el.style.display==='none'
+  el.style.display=open?'block':'none'
+  if(icon) icon.style.cssText=open?'font-size:.8rem;color:var(--accent);transform:rotate(90deg);transition:transform .2s':'font-size:.8rem;color:var(--text3);transition:transform .2s'
+}
 async function loadMySalary(){
   const[y,m]=salMonth.split('-').map(Number)
   document.getElementById('sal-title').textContent=y+'年'+m+'月'
@@ -1458,8 +1466,8 @@ async function loadMySalary(){
     <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>
     <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${count}件</span></div>
   </div>`
-  let dailyHtml=''
-  works.forEach(w=>{
+  // 日別明細：最新日は展開、過去分はアコーディオン
+  function buildSessionLines(w){
     const sessions=w.sessions||[]
     let sessionLines=''
     sessions.forEach((s,i)=>{
@@ -1485,13 +1493,23 @@ async function loadMySalary(){
       </div>`
     })
     if(!sessions.length){
-      const d=(w.details||[]).map(x=>`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${x.name}${x.count>1?'×'+x.count:''}</div>`).join('')
-      sessionLines=d
+      sessionLines=(w.details||[]).map(x=>`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${x.name}${x.count>1?'×'+x.count:''}</div>`).join('')
     }
-    dailyHtml+=`<div class="card" style="margin-bottom:.55rem">
-      <div class="sal-hero">
-        <div class="sal-lbl">${jpDate(w.date)}</div>
-        <div class="sal-amt">${fmt(w.net||w.back)}</div>
+    return sessionLines
+  }
+  // worksは日付昇順で来る。最後（最新）の日を展開、それ以前はアコーディオン
+  const latestDate=works[works.length-1]?.date
+  let dailyHtml=''
+  // 新しい日付が上に来るよう逆順で表示
+  const worksDesc=[...works].reverse()
+  worksDesc.forEach((w,idx)=>{
+    const isLatest=(w.date===latestDate)
+    const dn=['日','月','火','水','木','金','土'][new Date(w.date).getDay()]
+    const dateLabel=jpDate(w.date)+'（'+dn+'）'
+    const cardId='sal-day-'+w.date.replace(/-/g,'')
+    const detailId='sal-detail-'+w.date.replace(/-/g,'')
+    const sessionLines=buildSessionLines(w)
+    const detailBody=`<div class="sal-hero" style="margin-bottom:.4rem">
         <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
         <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(w.back||0)}</span></div>
         ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
@@ -1499,8 +1517,34 @@ async function loadMySalary(){
         <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt((w.sales||0)-(w.net||w.back||0))}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
       </div>
-      <div style="margin-top:.5rem">${sessionLines}</div>
-    </div>`
+      <div>${sessionLines}</div>`
+    if(isLatest){
+      // 最新日：常に展開
+      dailyHtml+=`<div class="card" style="margin-bottom:.55rem" id="${cardId}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+          <div>
+            <div style="font-size:.72rem;color:var(--accent);font-weight:700">${dateLabel}</div>
+            <div style="font-size:1.6rem;font-weight:700;line-height:1.2">${fmt(w.net||w.back)}</div>
+          </div>
+          <span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.12);padding:.15rem .6rem;border-radius:99px;font-weight:600">最新</span>
+        </div>
+        ${detailBody}
+      </div>`
+    } else {
+      // 過去分：日付行のみ、タップで展開
+      dailyHtml+=`<div class="card" style="margin-bottom:.4rem;padding:.6rem 1rem" id="${cardId}">
+        <div onclick="salDayToggle('${detailId}')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
+          <div>
+            <span style="font-size:.85rem;font-weight:700">${dateLabel}</span>
+            <span style="font-size:.8rem;color:var(--text3);margin-left:.6rem">${fmt(w.net||w.back)}</span>
+          </div>
+          <span id="${detailId}-icon" style="font-size:.8rem;color:var(--text3);transition:transform .2s">›</span>
+        </div>
+        <div id="${detailId}" style="display:none;margin-top:.5rem">
+          ${detailBody}
+        </div>
+      </div>`
+    }
   })
   if(dailyArea) dailyArea.innerHTML=dailyHtml
   // 書き込み後に現在のタブモードで表示切り替え
