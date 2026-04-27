@@ -2336,6 +2336,13 @@ async function renderGanttInto(area, date, filterShifts=null){
   const{data:rvs}=await sb.from('reservations').select('*').in('shift_id',shifts.map(s=>s.id)).order('checkin_time')
   const rvByShift={}
   ;(rvs||[]).forEach(r=>{if(!rvByShift[r.shift_id])rvByShift[r.shift_id]=[];rvByShift[r.shift_id].push(r)})
+  // インターバル設定取得
+  const castIdsG=[...new Set(shifts.map(s=>s.cast_id).filter(Boolean))]
+  let intervalBycastG={}
+  if(castIdsG.length){
+    const{data:feesG}=await sb.from('cast_fees').select('cast_id,interval_min').in('cast_id',castIdsG)
+    if(feesG) feesG.forEach(f=>{intervalBycastG[f.cast_id]=f.interval_min||0})
+  }
   // 時間軸
   const hourLabels=[]
   for(let h=START_H;h<=END_H;h+=2){
@@ -2369,13 +2376,55 @@ async function renderGanttInto(area, date, filterShifts=null){
     if(startPos===null||endPos===null) return
     const color=CAST_COLORS[si%CAST_COLORS.length]
     const shiftRvs=rvByShift[s.id]||[]
+    const intervalMin=intervalBycastG[s.cast_id]||0
+    const COURSE_MINS_G={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+    const timeStrToMin=t=>{if(!t)return null;const[h,m]=t.split(':').map(Number);return h<11?h*60+m+1440:h*60+m}
+    const minToTimeStr=m=>{const h=Math.floor(m/60)%24;return String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
+    // 予約を時系列ソート
+    const sortedRvsG=[...shiftRvs].filter(r=>r.checkin_time).sort((a,b)=>timeStrToMin(a.checkin_time?.slice(0,5))-timeStrToMin(b.checkin_time?.slice(0,5)))
     let rvBars=''
-    shiftRvs.forEach(r=>{
+    // インターバル・空き情報を下部に表示するHTML
+    let belowBars=''
+    sortedRvsG.forEach((r,ri)=>{
       const rStart=timeToPos(r.checkin_time?.slice(0,5))
       const rEnd=timeToPos(r.checkout_time?.slice(0,5))
       if(rStart===null||rEnd===null||rEnd-rStart<=0) return
-      rvBars+=`<div title="${r.customer_name||''}\n${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}\n${r.course||''}" style="position:absolute;left:${rStart}%;width:${rEnd-rStart}%;top:2px;bottom:2px;background:rgba(255,149,0,.9);border-radius:3px;z-index:5;display:flex;align-items:center;overflow:hidden"><span style="font-size:.52rem;color:#fff;font-weight:700;padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.customer_name?.replace('様','')||''}</span></div>`
+      // 予約ブロック（名前・コース・時刻）
+      const nameStr=r.customer_name?.replace('様','')||''
+      const courseStr=r.course||''
+      const timeStr=(r.checkin_time?.slice(0,5)||'')+'〜'+(r.checkout_time?.slice(0,5)||'')
+      rvBars+=`<div title="${r.customer_name||''}\n${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}\n${r.course||''}" style="position:absolute;left:${rStart}%;width:${rEnd-rStart}%;top:2px;bottom:2px;background:rgba(255,149,0,.9);border-radius:3px;z-index:5;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 3px">
+        <span style="font-size:.52rem;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameStr}</span>
+        <span style="font-size:.45rem;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${courseStr}</span>
+        <span style="font-size:.42rem;color:rgba(255,255,255,.8);white-space:nowrap">${timeStr}</span>
+      </div>`
+      // インターバルブロック（退室後）
+      if(intervalMin>0&&r.checkout_time){
+        const coMin=timeStrToMin(r.checkout_time.slice(0,5))
+        const intEndMin=coMin+intervalMin
+        const intEndStr=minToTimeStr(intEndMin)
+        const intStart=timeToPos(r.checkout_time.slice(0,5))
+        const intEnd=timeToPos(intEndStr)
+        if(intStart!==null&&intEnd!==null&&intEnd-intStart>0){
+          rvBars+=`<div style="position:absolute;left:${intStart}%;width:${intEnd-intStart}%;top:2px;bottom:2px;background:repeating-linear-gradient(-45deg,rgba(100,100,100,.55),rgba(100,100,100,.55) 2px,rgba(60,60,60,.25) 2px,rgba(60,60,60,.25) 6px);border-radius:0 3px 3px 0;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <span style="font-size:.43rem;color:#fff;font-weight:700;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5)">ｲﾝﾀｰﾊﾞﾙ</span>
+          </div>`
+        }
+        // 次予約との空き表示
+        const nextRv=sortedRvsG[ri+1]
+        const nextCheckinMin=nextRv?.checkin_time?timeStrToMin(nextRv.checkin_time.slice(0,5)):null
+        const gapMin=nextCheckinMin!==null?nextCheckinMin-intEndMin:null
+        // 下部テキスト：最短予約可能時間 + 次予約まで余裕
+        let belowText=`⏱ 最短 ${intEndStr}〜`
+        if(gapMin!==null&&gapMin>0){
+          belowText+=`　▷ 次予約まで ${gapMin}分空き`
+        } else if(gapMin!==null&&gapMin<=0){
+          belowText+=`　▷ 次予約まで余裕なし`
+        }
+        belowBars+=`<div style="font-size:.58rem;color:var(--text3);padding:.1rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${belowText}</div>`
+      }
     })
+    // belowBarsをrows生成時に使用するため一旦変数保持（下のrows+=で参照）
     let freeBars=''
     const sorted=[...shiftRvs].filter(r=>r.checkin_time&&r.checkout_time).sort((a,b)=>a.checkin_time.localeCompare(b.checkin_time))
     let prevEnd=s.start_time?.slice(0,5)||''
@@ -2385,17 +2434,21 @@ async function renderGanttInto(area, date, filterShifts=null){
       if(fS!==null&&fE!==null&&fE-fS>0.5) freeBars+=`<div style="position:absolute;left:${fS}%;width:${fE-fS}%;top:4px;bottom:4px;background:rgba(52,199,89,.25);border-radius:2px;border:1px dashed rgba(52,199,89,.5);z-index:3"></div>`
       prevEnd=r.checkout_time?.slice(0,5)||prevEnd
     })
-    rows+=`<div style="display:flex;align-items:center;margin-bottom:.55rem;gap:.4rem">
-      <div style="width:54px;min-width:54px;font-size:.7rem;font-weight:700;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2">${s.casts?.name||'?'}<br><span style="font-size:.55rem;font-weight:400;color:var(--text3)">${s.start_time?.slice(0,5)||''}-${s.end_time?.slice(0,5)||''}</span></div>
-      <div style="flex:1;position:relative;height:32px;background:var(--surface2);border-radius:4px;overflow:visible">
-        ${hourLines.join('')}
-        <div style="position:absolute;left:${startPos}%;width:${endPos-startPos}%;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}66;border-radius:3px;z-index:2"></div>
-        ${freeBars}${rvBars}${nowLine}
+    rows+=`<div style="margin-bottom:.55rem">
+      <div style="display:flex;align-items:center;gap:.4rem">
+        <div style="width:54px;min-width:54px;font-size:.7rem;font-weight:700;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2">${s.casts?.name||'?'}<br><span style="font-size:.55rem;font-weight:400;color:var(--text3)">${s.start_time?.slice(0,5)||''}-${s.end_time?.slice(0,5)||''}</span></div>
+        <div style="flex:1;position:relative;height:36px;background:var(--surface2);border-radius:4px;overflow:visible">
+          ${hourLines.join('')}
+          <div style="position:absolute;left:${startPos}%;width:${endPos-startPos}%;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}66;border-radius:3px;z-index:2"></div>
+          ${freeBars}${rvBars}${nowLine}
+        </div>
       </div>
+      ${belowBars?`<div style="margin-left:58px;margin-top:.15rem">${belowBars}</div>`:''}
     </div>`
   })
   const legend=`<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem;font-size:.62rem">
     <div style="display:flex;align-items:center;gap:.2rem"><div style="width:10px;height:7px;background:rgba(255,149,0,.9);border-radius:2px"></div>予約</div>
+    <div style="display:flex;align-items:center;gap:.2rem"><div style="width:10px;height:7px;background:repeating-linear-gradient(-45deg,rgba(100,100,100,.55),rgba(100,100,100,.55) 2px,rgba(60,60,60,.25) 2px,rgba(60,60,60,.25) 6px);border-radius:2px"></div>インターバル</div>
     <div style="display:flex;align-items:center;gap:.2rem"><div style="width:10px;height:7px;background:rgba(52,199,89,.25);border:1px dashed rgba(52,199,89,.5);border-radius:2px"></div>空き</div>
     ${date===todayStr?'<div style="display:flex;align-items:center;gap:.2rem"><div style="width:2px;height:8px;background:rgba(255,59,48,.7)"></div>現在</div>':''}
   </div>`
