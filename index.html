@@ -1926,6 +1926,20 @@ function autoCalcCheckout(){
   const nm=total%60
   document.getElementById('rv-checkout').value=`${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
 }
+// 予約修正フォーム用（rve-）
+function autoCalcRveCheckout(){
+  const checkin=document.getElementById('rve-checkin')?.value
+  const course=document.getElementById('rve-course')?.value
+  if(!checkin||!course)return
+  const mins=COURSE_MINUTES[course]||parseInt(course)||0
+  if(!mins)return
+  const[h,m]=checkin.split(':').map(Number)
+  const total=h*60+m+mins
+  const nh=Math.floor(total/60)%24
+  const nm=total%60
+  const el=document.getElementById('rve-checkout')
+  if(el) el.value=`${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
+}
 
 async function toggleAutoRegister(chk){
   const existingArea=document.getElementById('rv-existing-area')
@@ -2625,6 +2639,8 @@ async function confirmRoomAssign(shiftId){
     ownerShiftData.pending=ownerShiftData.pending.filter(s=>Number(s.id)!==Number(shiftId))
   }
   refreshOwnerRoomGrid()
+  // 承認待ち詳細シートが開いている場合は再描画（他キャストの仮選択状態は_tempRoomMapで保持）
+  if(shift) ownerSelectDay(shift.date)
   if(shift&&shift.date===bizDay()){loadToday()}
   // バックグラウンドでカレンダーも更新（ルーム表には影響しない）
   setTimeout(()=>loadOwnerCal(),2000)
@@ -3371,7 +3387,7 @@ function calcTotal2(){
     // カード手数料（6%+80円、カードがある場合のみ）
     const blockCardFee=cardBase>0?Math.floor(cardBase*0.06)+80:0
     // カード10%上乗せ分（お客様請求額への加算）
-    const cardSurcharge=cardBase>0?Math.ceil(cardBase*0.1):0
+    const cardSurcharge=cardBase>0?Math.round(cardBase*0.1):0
     // 実際の売上（お客様請求）= 元売上 + カード10%上乗せ
     const blockSalesBase=coursePrice+shimeiPrice+optSale+extSale-blockDiscShop-blockDiscBack
     const blockSales=blockSalesBase+cardSurcharge
@@ -3393,7 +3409,7 @@ function calcTotal2(){
     // 内訳：全行をgridで統一（項目 / お客様請求 / 委託金 / 店落ち）
     const G='display:grid;grid-template-columns:1fr 68px 62px 62px;padding:.15rem 0;border-bottom:1px solid var(--border);align-items:center'
     const row=(label,basePrice,back,isCard=false)=>{
-      const billedPrice=isCard?Math.ceil(basePrice*1.1):basePrice
+      const billedPrice=isCard?Math.round(basePrice*1.1):basePrice
       const shop=billedPrice-back
       return `<div style="${G}">
         <span style="color:var(--text3);font-size:.75rem">${label}${isCard?'<span style="font-size:.6rem;color:#1565c0;margin-left:.2rem">C</span>':''}</span>
@@ -3454,8 +3470,8 @@ function calcTotal2(){
   const totalDiscAll=discFromBack+discFromShop
   bd+=`<div class="sal-row"><span class="sal-rl">売上（お客様請求）</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
   if(totalCardBase>0){
-    bd+=`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:var(--text3)">└ 現金</span><span class="sal-rv" style="font-size:.78rem">${fmt(totalSales-Math.ceil(totalCardBase*1.1))}</span></div>`
-    bd+=`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:#1565c0">└ カード請求(10%込)</span><span class="sal-rv" style="font-size:.78rem;color:#1565c0">${fmt(Math.ceil(totalCardBase*1.1))}</span></div>`
+    bd+=`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:var(--text3)">└ 現金</span><span class="sal-rv" style="font-size:.78rem">${fmt(totalSales-Math.round(totalCardBase*1.1))}</span></div>`
+    bd+=`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:#1565c0">└ カード請求(10%込)</span><span class="sal-rv" style="font-size:.78rem;color:#1565c0">${fmt(Math.round(totalCardBase*1.1))}</span></div>`
   }
   if(totalDiscAll>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(totalDiscAll)}</span></div>`
   bd+=`<div style="border-top:1px dashed var(--border);margin:.2rem 0"></div>`
@@ -4197,7 +4213,7 @@ async function openShiftReservations(shiftId, castName){
         <div style="font-size:.6rem;color:#1565c0;font-weight:700;margin-bottom:.2rem">💳 カード内訳</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;text-align:center">
           <div><div style="font-size:.58rem;color:#555">カード金額</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div></div>
-          <div><div style="font-size:.58rem;color:#555">お客請求(10%)</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(Math.ceil(cardAmt*1.1))}</div></div>
+          <div><div style="font-size:.58rem;color:#555">お客請求(10%)</div><div style="font-size:.78rem;font-weight:700;color:#1565c0">${fmt(Math.round(cardAmt*1.1))}</div></div>
           <div><div style="font-size:.58rem;color:#555">手数料(6%+80円)</div><div style="font-size:.78rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.06)+80)}</div></div>
         </div>
       </div>`:''}
@@ -4323,7 +4339,7 @@ async function openRvDetail(rvId, shiftId, castName){
         <div style="font-size:.62rem;color:#1565c0;font-weight:700;margin-bottom:.25rem">💳 カード内訳</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;text-align:center">
           <div><div style="font-size:.6rem;color:#555">カード金額</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(cardAmt)}</div></div>
-          <div><div style="font-size:.6rem;color:#555">お客請求(10%)</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(Math.ceil(cardAmt*1.1))}</div></div>
+          <div><div style="font-size:.6rem;color:#555">お客請求(10%)</div><div style="font-size:.85rem;font-weight:700;color:#1565c0">${fmt(Math.round(cardAmt*1.1))}</div></div>
           <div><div style="font-size:.6rem;color:#555">手数料(6%+80円)</div><div style="font-size:.85rem;font-weight:700;color:#c62828">-${fmt(Math.floor(cardAmt*0.06)+80)}</div></div>
         </div>
       </div>`:''}
@@ -4413,7 +4429,7 @@ async function openRvEdit(rvId){
       </div>
       <div><div class="fi-lbl">コース</div>
         <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;align-items:center">
-          <select class="fi" id="rve-course">${courseOpts}</select>
+          <select class="fi" id="rve-course" onchange="autoCalcRveCheckout()">${courseOpts}</select>
           <select class="fi" id="rve-pay-course" style="width:80px">
             <option value="現金" ${(pj.course||'現金')==='現金'?'selected':''}>💴現金</option>
             <option value="カード" ${pj.course==='カード'?'selected':''}>💳カード</option>
@@ -4421,7 +4437,7 @@ async function openRvEdit(rvId){
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-        <div><div class="fi-lbl">入室</div><input class="fi" id="rve-checkin" type="time" value="${r.checkin_time?.slice(0,5)||''}"></div>
+        <div><div class="fi-lbl">入室</div><input class="fi" id="rve-checkin" type="time" value="${r.checkin_time?.slice(0,5)||''}" oninput="autoCalcRveCheckout()"></div>
         <div><div class="fi-lbl">退室</div><input class="fi" id="rve-checkout" type="time" value="${r.checkout_time?.slice(0,5)||''}"></div>
       </div>
       ${optItems?`<div><div class="fi-lbl">オプション</div>
@@ -4705,7 +4721,7 @@ async function renderMonthlyContent(){
     const total=cp+sp+op+extTotal-dp
     const payCourse=pj.course||'現金',payShimei=pj.shimei||'現金',payOpt=pj.option||'現金'
     const cardBase=(payCourse==='カード'?cp:0)+(payShimei==='カード'?sp:0)+(payOpt==='カード'?op:0)+(payExt==='カード'?extTotal:0)
-    const card=cardBase>0?Math.ceil(cardBase*1.1):0
+    const card=cardBase>0?Math.round(cardBase*1.1):0
     return {total,card,cardBase,cash:total-cardBase,shimei:r.shimei_type||'フリー',isNew:!!(r.is_new===true||r.is_new==='true')}
   }
 
