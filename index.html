@@ -2067,21 +2067,19 @@ async function saveReservation(){
     const{data:last}=await sb.from('customers').select('customer_no').order('customer_no',{ascending:false}).limit(1)
     const nextNo=((last||[])[0]?.customer_no||0)+1
     custNoInt=nextNo
-    // customersテーブルに新規登録
+    // customersテーブルに新規登録し、idも取得
     const custName2=finalName.endsWith('様')?finalName:finalName+'様'
     const phone2=document.getElementById('rv-phone')?.value.trim()||''
-    const{error:custErr}=await sb.from('customers').insert({
+    const{data:insertedCust,error:custErr}=await sb.from('customers').insert({
       customer_no:nextNo,
       name:custName2,
       phone:phone2,
       memo:'',
       ng_casts:'',
       is_banned:false
-    })
+    }).select('id').single()
     if(custErr){toast('顧客登録エラー: '+(custErr.message||custErr.code||JSON.stringify(custErr)));return}
-    // 登録したレコードのidを取得
-    const{data:newCust}=await sb.from('customers').select('id').eq('customer_no',nextNo).single()
-    allCustomers.push({id:newCust?.id,customer_no:nextNo,name:custName2})
+    allCustomers.push({id:insertedCust?.id||null,customer_no:nextNo,name:custName2})
     toast('No.'+nextNo+' で顧客登録しました！')
   }
   const{error}=await sb.from('reservations').insert({
@@ -2093,13 +2091,26 @@ async function saveReservation(){
   })
   if(error){toast('エラー: '+error.message);return}
   // 顧客の来店記録にも追加
-  const custId=autoRegister
-    ? allCustomers.find(x=>x.customer_no===custNoInt)?.id
-    : allCustomers.find(x=>x.customer_no===parseInt(custNo)||x.id===parseInt(custNo))?.id
+  let custId=null
+  if(autoRegister){
+    // 新規自動登録：直前にDBから取得したidを使う
+    custId=allCustomers.find(x=>x.customer_no===custNoInt)?.id||null
+  } else if(custNoInt){
+    // 既存顧客：customer_noのみで検索（idと混在させない）
+    const found=allCustomers.find(x=>x.customer_no===custNoInt)
+    if(found){
+      custId=found.id
+    } else {
+      // allCustomersにない場合はDBから直接取得
+      const{data:dbCust}=await sb.from('customers').select('id').eq('customer_no',custNoInt).maybeSingle()
+      custId=dbCust?.id||null
+    }
+  }
   if(custId){
-    await sb.from('customer_visits').insert({
+    const{error:visitErr}=await sb.from('customer_visits').insert({
       customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
     })
+    if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
   toast('予約を登録しました')
   closeSheet('reservation')
