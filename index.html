@@ -3219,7 +3219,7 @@ async function loadGanttModal(){
             ${ci?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${ci}</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.65);line-height:.85;white-space:nowrap">〜</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${co}</div>`:''}
           </div>
         </div>`
-        // インターバルブロック（退室後）
+        // 退室後インターバル
         if(intervalMinM>0&&r.checkout_time){
           const coMinM=timeStrToMinM(r.checkout_time.slice(0,5))
           const intEndMinM=coMinM+intervalMinM
@@ -3227,34 +3227,48 @@ async function loadGanttModal(){
           const intSPx=timeToPx(r.checkout_time.slice(0,5))
           const intEPx=timeToPx(intEndStrM)
           if(intSPx!==null&&intEPx!==null&&intEPx-intSPx>0){
-            rvBars+=`<div style="position:absolute;left:${intSPx}px;width:${intEPx-intSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(60,60,60,.65),rgba(60,60,60,.65) 2px,rgba(20,20,20,.25) 2px,rgba(20,20,20,.25) 7px);border-radius:0 5px 5px 0;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
-              <span style="font-size:.48rem;color:#fff;font-weight:800;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.7)">ｲﾝﾀｰﾊﾞﾙ</span>
+            rvBars+=`<div style="position:absolute;left:${intSPx}px;width:${intEPx-intSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(50,50,50,.7),rgba(50,50,50,.7) 2px,rgba(10,10,10,.2) 2px,rgba(10,10,10,.2) 7px);border-radius:0 5px 5px 0;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <span style="writing-mode:vertical-rl;font-size:.44rem;color:#fff;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.05em">ｲﾝﾀｰﾊﾞﾙ</span>
             </div>`
           }
-          // 次予約の直前にもインターバルブロック（予約開始前20分）
+          // 次予約の直前インターバル（全予約に前インターバルを追加）
           const nextRvM=sortedRvsM[ri+1]
           if(nextRvM?.checkin_time){
             const nextCheckinMinM=timeStrToMinM(nextRvM.checkin_time.slice(0,5))
             const preIntStartMin=nextCheckinMinM-intervalMinM
-            // インターバル終了より後にpreIntStartがある場合のみ表示（空き帯がある場合）
             if(preIntStartMin>intEndMinM){
               const preIntSPx=timeToPx(minToTimeStrM(preIntStartMin))
               const preIntEPx=timeToPx(nextRvM.checkin_time.slice(0,5))
               if(preIntSPx!==null&&preIntEPx!==null&&preIntEPx-preIntSPx>0){
-                rvBars+=`<div style="position:absolute;left:${preIntSPx}px;width:${preIntEPx-preIntSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(60,60,60,.65),rgba(60,60,60,.65) 2px,rgba(20,20,20,.25) 2px,rgba(20,20,20,.25) 7px);border-radius:5px 0 0 5px;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
-                  <span style="font-size:.48rem;color:#fff;font-weight:800;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.7)">ｲﾝﾀｰﾊﾞﾙ</span>
+                rvBars+=`<div style="position:absolute;left:${preIntSPx}px;width:${preIntEPx-preIntSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(50,50,50,.7),rgba(50,50,50,.7) 2px,rgba(10,10,10,.2) 2px,rgba(10,10,10,.2) 7px);border-radius:5px 0 0 5px;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                  <span style="writing-mode:vertical-rl;font-size:.44rem;color:#fff;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.05em">ｲﾝﾀｰﾊﾞﾙ</span>
                 </div>`
               }
             }
           }
+          // belowBars：純粋空き時間を表示
           const nextRvM2=sortedRvsM[ri+1]
           const nextCheckinMinM=nextRvM2?.checkin_time?timeStrToMinM(nextRvM2.checkin_time.slice(0,5)):null
-          // 純粋空き時間 = インターバル終了 〜 次予約前インターバル開始
           const pureGapMinB=nextCheckinMinM!==null?nextCheckinMinM-intervalMinM-intEndMinM:null
           let belowTextM=`⏱ 最短 ${intEndStrM}〜`
-          if(pureGapMinB!==null&&pureGapMinB>0) belowTextM+=`　▷ 純空き ${pureGapMinB}分（次予約まで ${nextCheckinMinM-intEndMinM}分）`
+          if(pureGapMinB!==null&&pureGapMinB>0) belowTextM+=`　▷ 純空き ${pureGapMinB}分`
           else if(pureGapMinB!==null&&pureGapMinB<=0) belowTextM+=`　▷ 次予約まで余裕なし`
           belowBarsM+=`<div style="font-size:.6rem;color:var(--text3);padding:.05rem ${PAD}px;white-space:nowrap">${belowTextM}</div>`
+        }
+        // 最初の予約の前インターバル（シフト開始後、最初の予約の前にも表示）
+        if(ri===0&&intervalMinM>0&&r.checkin_time){
+          const firstCheckinMin=timeStrToMinM(r.checkin_time.slice(0,5))
+          const preIntStartMin=firstCheckinMin-intervalMinM
+          const shiftStartMin=timeStrToMinM(s.start_time?.slice(0,5))
+          if(shiftStartMin!==null&&preIntStartMin>shiftStartMin){
+            const preIntSPx=timeToPx(minToTimeStrM(preIntStartMin))
+            const preIntEPx=timeToPx(r.checkin_time.slice(0,5))
+            if(preIntSPx!==null&&preIntEPx!==null&&preIntEPx-preIntSPx>0){
+              rvBars+=`<div style="position:absolute;left:${preIntSPx}px;width:${preIntEPx-preIntSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(50,50,50,.7),rgba(50,50,50,.7) 2px,rgba(10,10,10,.2) 2px,rgba(10,10,10,.2) 7px);border-radius:5px;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <span style="writing-mode:vertical-rl;font-size:.44rem;color:#fff;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.05em">ｲﾝﾀｰﾊﾞﾙ</span>
+              </div>`
+            }
+          }
         }
       })
 
@@ -3279,8 +3293,8 @@ async function loadGanttModal(){
           const pureGapMin=Math.max(0,(beforeIntStartMin??fEMin)-(afterIntEndMin??fSMin))
           const fitCourse=COURSE_LABELS.find(([m])=>pureGapMin>=m)
           const courseLabel=fitCourse?fitCourse[1]+' 可':pureGapMin>0?pureGapMin+'分':''
-          freeBars+=`<div style="position:absolute;left:${fS}px;width:${fE-fS}px;top:3px;bottom:3px;background:rgba(52,199,89,.15);border-radius:3px;border:1.5px dashed rgba(52,199,89,.5);z-index:3;display:flex;align-items:center;justify-content:center;overflow:hidden">
-            ${courseLabel&&fE-fS>28?`<span style="font-size:.44rem;color:rgba(52,150,89,.9);font-weight:800;white-space:nowrap;text-shadow:0 0 4px #fff">${courseLabel}</span>`:''}
+          freeBars+=`<div style="position:absolute;left:${fS}px;width:${fE-fS}px;top:3px;bottom:3px;background:rgba(255,255,255,.55);border-radius:3px;border:1.5px dashed rgba(100,160,255,.6);z-index:3;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            ${courseLabel&&fE-fS>28?`<span style="font-size:.46rem;color:#2255cc;font-weight:800;white-space:nowrap;background:rgba(255,255,255,.85);padding:1px 3px;border-radius:3px">${courseLabel}</span>`:''}
           </div>`
         }
         prevEnd=r.checkout_time?.slice(0,5)||prevEnd
@@ -3310,7 +3324,7 @@ async function loadGanttModal(){
   const legend=`<div style="display:flex;gap:.45rem;flex-wrap:wrap;font-size:.54rem;padding:2px ${PAD}px 0;opacity:.75">
     <span style="display:flex;align-items:center;gap:.18rem"><span style="display:inline-block;width:9px;height:6px;background:linear-gradient(135deg,#FF9A2E,#FF6400);border-radius:2px"></span>予約</span>
     <span style="display:flex;align-items:center;gap:.18rem"><span style="display:inline-block;width:9px;height:6px;background:repeating-linear-gradient(-45deg,rgba(60,60,60,.65),rgba(60,60,60,.65) 2px,rgba(20,20,20,.25) 2px,rgba(20,20,20,.25) 7px);border-radius:2px"></span>インターバル</span>
-    <span style="display:flex;align-items:center;gap:.18rem"><span style="display:inline-block;width:9px;height:6px;background:rgba(52,199,89,.15);border:1.5px dashed rgba(52,199,89,.5);border-radius:2px"></span>空き</span>
+    <span style="display:flex;align-items:center;gap:.18rem"><span style="display:inline-block;width:9px;height:6px;background:rgba(255,255,255,.55);border:1.5px dashed rgba(100,160,255,.6);border-radius:2px"></span>空き</span>
     <span style="display:flex;align-items:center;gap:.18rem"><span style="display:inline-block;width:1.5px;height:7px;background:rgba(0,0,0,.2)"></span>1h</span>
     ${ganttModalDate===todayStr?`<span style="display:flex;align-items:center;gap:.18rem"><span style="display:inline-block;width:2px;height:7px;background:rgba(255,59,48,.85)"></span>現在</span>`:''}
   </div>`
