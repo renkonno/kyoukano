@@ -3848,7 +3848,7 @@ async function loadCastMgmt(){
       }
     }
     return `<div class="cast-row">
-      <div class="cast-nm">${c.name}${badge}</div>
+      <div class="cast-nm">${c.name}${badge}<span style="font-size:.65rem;color:var(--text3);margin-left:.5rem;border:1px solid var(--border);border-radius:4px;padding:1px 5px">PIN: ${c.pin||'未設定'}</span></div>
       <div class="cast-btns">
         <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">委託金設定</button>
         <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
