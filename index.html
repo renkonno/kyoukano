@@ -3259,15 +3259,12 @@ async function loadGanttModal(){
         if(ri===0&&intervalMinM>0&&r.checkin_time){
           const firstCheckinMin=timeStrToMinM(r.checkin_time.slice(0,5))
           const preIntStartMin=firstCheckinMin-intervalMinM
-          const shiftStartMin=timeStrToMinM(s.start_time?.slice(0,5))
-          if(shiftStartMin!==null&&preIntStartMin>shiftStartMin){
-            const preIntSPx=timeToPx(minToTimeStrM(preIntStartMin))
-            const preIntEPx=timeToPx(r.checkin_time.slice(0,5))
-            if(preIntSPx!==null&&preIntEPx!==null&&preIntEPx-preIntSPx>0){
-              rvBars+=`<div style="position:absolute;left:${preIntSPx}px;width:${preIntEPx-preIntSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(50,50,50,.7),rgba(50,50,50,.7) 2px,rgba(10,10,10,.2) 2px,rgba(10,10,10,.2) 7px);border-radius:5px;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
-                <span style="writing-mode:vertical-rl;font-size:.44rem;color:#fff;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.05em">ｲﾝﾀｰﾊﾞﾙ</span>
-              </div>`
-            }
+          const preIntSPx=timeToPx(minToTimeStrM(preIntStartMin))
+          const preIntEPx=timeToPx(r.checkin_time.slice(0,5))
+          if(preIntSPx!==null&&preIntEPx!==null&&preIntEPx-preIntSPx>0){
+            rvBars+=`<div style="position:absolute;left:${preIntSPx}px;width:${preIntEPx-preIntSPx}px;top:1px;bottom:1px;background:repeating-linear-gradient(-45deg,rgba(50,50,50,.7),rgba(50,50,50,.7) 2px,rgba(10,10,10,.2) 2px,rgba(10,10,10,.2) 7px);border-radius:5px;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <span style="writing-mode:vertical-rl;font-size:.44rem;color:#fff;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.05em">ｲﾝﾀｰﾊﾞﾙ</span>
+            </div>`
           }
         }
       })
