@@ -651,7 +651,7 @@ tr:last-child td{border-bottom:none}
     <div id="trial-banner" style="display:none;background:#fff8e1;border:1.5px solid #f9a825;border-radius:8px;padding:.4rem .75rem;font-size:.78rem;color:#e65100;font-weight:600;margin-bottom:.6rem">🌱 体験期間中のバックを適用しています</div>
     <div id="session-list"></div>
     <button class="btn btn-ghost btn-full" style="margin-bottom:.75rem" onclick="addSession()">＋ 施術を追加</button>
-    <div class="fg"><label>雑費（円）<span style="font-size:.7rem;color:var(--text3)">（自動：0本=¥0 / 1〜2本=¥1,000 / 3本〜=¥2,000）</span></label>
+    <div class="fg"><label>雑費（円）<span style="font-size:.7rem;color:var(--text3)">（自動：0〜1本=¥0 / 2本=¥1,000 / 3本〜=¥2,000）</span></label>
       <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="this.dataset.manual='true';calcTotal2()" placeholder="0">
     </div>
     <div class="fg"><label>保証（円）<span style="font-size:.7rem;color:var(--text3)">（予約0本時に店が支払う最低保証額）</span></label>
@@ -760,8 +760,8 @@ tr:last-child td{border-bottom:none}
           <option value="0">しない（手動入力）</option>
         </select>
       </div>
-      <div class="fee-row"><div><div class="fee-lbl">0本の雑費</div></div><input type="number" class="fee-input" id="f-misc-0" min="0" step="100" value="0"><span class="fee-unit">円</span></div>
-      <div class="fee-row"><div><div class="fee-lbl">1〜2本の雑費</div></div><input type="number" class="fee-input" id="f-misc-1" min="0" step="100" value="1000"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">0〜1本の雑費</div></div><input type="number" class="fee-input" id="f-misc-0" min="0" step="100" value="0"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">2本の雑費</div></div><input type="number" class="fee-input" id="f-misc-1" min="0" step="100" value="1000"><span class="fee-unit">円</span></div>
       <div class="fee-row"><div><div class="fee-lbl">3本〜の雑費</div></div><input type="number" class="fee-input" id="f-misc-3" min="0" step="100" value="2000"><span class="fee-unit">円</span></div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:.75rem">
@@ -3574,8 +3574,8 @@ function calcTotal2(){
   const autoMisc=sheetFee.misc_enabled!==false
   if(autoMisc){
     let autoMiscAmt=0
-    if(sessionCount===0) autoMiscAmt=sheetFee.misc_0??0
-    else if(sessionCount<=2) autoMiscAmt=sheetFee.misc_1??1000
+    if(sessionCount<=1) autoMiscAmt=sheetFee.misc_0??0
+    else if(sessionCount===2) autoMiscAmt=sheetFee.misc_1??1000
     else autoMiscAmt=sheetFee.misc_3??2000
     document.getElementById('w-misc').value=autoMiscAmt
   }
