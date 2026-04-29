@@ -1457,9 +1457,9 @@ async function loadMySalary(){
     <div class="sal-lbl">${me.name} — ${parseInt(m)}月の委託金</div>
     <div class="sal-amt">${fmt(totalNet)}</div>
     <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(totalSales)}</span></div>
-    <div class="sal-row"><span class="sal-rl">委託金合計</span><span class="sal-rv">${fmt(totalBack)}</span></div>
+    <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金合計</span><span class="sal-rv" style="color:#c62828">${fmt(totalBack)}</span></div>
     <div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(totalMisc)}</span></div>
-    <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(totalNet)}</span></div>
+    <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv tot" style="color:#c62828">${fmt(totalNet)}</span></div>
     <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>
     <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${count}件</span></div>
   </div>`
@@ -1508,9 +1508,9 @@ async function loadMySalary(){
     const sessionLines=buildSessionLines(w)
     const detailBody=`<div class="sal-hero" style="margin-bottom:.4rem">
         <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
-        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(w.back||0)}</span></div>
+        <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv" style="color:#c62828">${fmt(w.back||0)}</span></div>
         ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
-        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(w.net||w.back)}</span></div>
+        <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv tot" style="color:#c62828">${fmt(w.net||w.back)}</span></div>
         <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt((w.sales||0)-(w.net||w.back||0))}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
       </div>
@@ -4226,7 +4226,7 @@ async function loadOwnerSalary(){
       <div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(totalGross)}</span></div>
       ${totalDiscAll>0?`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(totalDiscAll)}</span></div>`:''}
       <div class="sal-row"><span class="sal-rl" style="font-weight:700">純売上高</span><span class="sal-rv tot">${fmt(totalSales)}</span></div>
-      <div class="sal-row"><span class="sal-rl">委託金合計</span><span class="sal-rv">${fmt(totalNet)}</span></div>
+      <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金合計</span><span class="sal-rv" style="color:#c62828">${fmt(totalNet)}</span></div>
       <div class="sal-row"><span class="sal-rl" style="font-weight:700;color:#1565c0">粗利益</span><span class="sal-rv tot" style="color:#1565c0">${fmt(totalProfit)}</span></div>
       <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${totalCount}件</span></div>
     </div>
@@ -4261,7 +4261,7 @@ async function loadOwnerSalary(){
         <div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(gross)}</span></div>
         ${disc>0?`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(disc)}</span></div>`:''}
         <div class="sal-row"><span class="sal-rl">純売上高</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
-        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(w.net||w.back||0)}</span></div>
+        <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv" style="color:#c62828">${fmt(w.net||w.back||0)}</span></div>
         ${misc>0?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`:''}
         <div class="sal-row"><span class="sal-rl" style="font-weight:700;color:#1565c0">粗利益</span><span class="sal-rv tot" style="color:#1565c0">${fmt(shopDrop)}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}件</span></div>
