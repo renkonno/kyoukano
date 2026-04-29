@@ -5170,7 +5170,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
   const cols=[
     {l:'日付',w:'46px',align:'left',sticky:true},
     {l:'総売上',w:'56px'},{l:'割引',w:'44px',color:'#c62828'},{l:'純売上',w:'56px'},{l:'現金売上',w:'56px'},
-    {l:'カード',w:'56px',color:'#1565c0'},{l:'手数料',w:'46px',color:'#c62828'},
+    {l:'カード',w:'56px'},{l:'手数料',w:'46px',color:'#c62828'},
     {l:'委託金',w:'54px',color:'#c62828'},{l:'立替金',w:'50px',color:'#c62828'},
     {l:'粗利益',w:'54px',color:'#1565c0'},{l:'現金残',w:'54px',color:'#1565c0'},
     {l:'客単価',w:'52px'},{l:'出勤',w:'30px'},
@@ -5208,7 +5208,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     html+=C(r.disc>0?'-'+Ns(r.disc):'—',r.disc>0?'#c62828':'#ccc')
     html+=C(r.disc>0?Ns(r.gross_work):Ns(r.gross))
     html+=C(Ns(r.cash))
-    html+=C(Ns(r.card),'#1565c0')
+    html+=C(Ns(r.card))
     html+=C(r.cardFee>0?Ns(r.cardFee):'—','#c62828')
     html+=C(Ns(r.net),'#c62828')
     html+=C(hasAdv?Ns(r.advance):'—',hasAdv?'#c62828':'#ccc',hasAdv)
@@ -5241,7 +5241,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
         html+=Cc(c.disc>0?'-'+Ns(c.disc):'—',c.disc>0?'#c62828':'#bbb')
         html+=Cc(Ns(c.sales||c.cash+c.cardBase))
         html+=Cc(Ns(c.cash))
-        html+=Cc(Ns(c.card),'#1565c0')
+        html+=Cc(Ns(c.card))
         html+=Cc('—','#ccc')
         html+=Cc(Ns(c.net),'#c62828',true)
         html+=Cc(cAdv?Ns(c.advance):'—',cAdv?'#c62828':'#bbb',cAdv)
@@ -5262,7 +5262,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     ${[Ns(tot.gross),tot.disc>0?'-'+Ns(tot.disc):'—',Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
        totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),tot.count>0?Ns(Math.round(tot.gross_work/tot.count)):'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
-      .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===1?';color:#c62828':i===5?';color:#c62828':i===6?';color:#c62828':i===7&&totAdv?';color:#c62828':i===4?';color:#1565c0':i===8?';color:#1565c0':i===9?';color:'+(totCashNeg?'#c62828':'#1565c0'):''}">${v}</td>`).join('')}
+      .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===1?';color:#c62828':i===5?';color:#c62828':i===6?';color:#c62828':i===7&&totAdv?';color:#c62828':i===8?';color:#1565c0':i===9?';color:'+(totCashNeg?'#c62828':'#1565c0'):''}">${v}</td>`).join('')}
   </tr>`
 
   const legend=`<div style="display:flex;gap:.7rem;font-size:.6rem;color:var(--text3);margin-bottom:.35rem;flex-wrap:wrap;align-items:center">
