@@ -982,7 +982,7 @@ let me=null, courses=[], opts=[], storeSettings={}
 let calMonth=ym(new Date()), salMonth=ym(new Date())
 let ownerCalMonth=ym(new Date()), ownerSalMonth=ym(new Date()), ownerSalDate=null
 let selectedDate=null, myShifts=[]
-let sheetCastId=null, sheetCastName='', sheetDate='', sheetFee={...DEFAULT_FEE}, sheetDiscs=[]
+let sheetCastId=null, sheetCastName='', sheetDate='', sheetFee={...DEFAULT_FEE}, sheetDiscs=[], trialWorkDays=0
 let roomShiftId=null, feeCastId=null, discCastId=null, editShiftId=null
 
 function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
@@ -3338,6 +3338,13 @@ async function openWorkSheet(shiftId,castName,date,castId){
   document.getElementById('work-info').textContent=jpDate(date)
   const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castId).single()
   sheetFee=fee?{...DEFAULT_FEE,...fee}:{...DEFAULT_FEE}
+  // 体験出勤日数をカウント（入店日以降の承認済みシフト日数）
+  trialWorkDays=0
+  const trialDaysSet=sheetFee.trial_days||0
+  if(trialDaysSet&&sheetFee.joined_at){
+    const{data:trialShifts}=await sb.from('shifts').select('date').eq('cast_id',castId).eq('status','approved').gte('date',sheetFee.joined_at).lte('date',date)
+    trialWorkDays=(trialShifts||[]).length
+  }
   // 体験期間バナー表示
   const trialBanner=document.getElementById('trial-banner')
   if(trialBanner) trialBanner.style.display=isTrialPeriod()?'block':'none'
@@ -3485,16 +3492,14 @@ function removeSession(btn){
   calcTotal2()
 }
 
-// 体験期間中かどうか判定（sheetDateと入店日・体験日数を使用）
+// 体験期間中かどうか判定（入店日以降の出勤日数ベース）
 function isTrialPeriod(){
   const trialDays=sheetFee.trial_days||0
   if(!trialDays) return false
-  const joinedAt=sheetFee.joined_at
-  if(!joinedAt) return false
-  const joined=new Date(joinedAt)
-  const target=new Date(sheetDate||new Date().toISOString().slice(0,10))
-  const diffDays=Math.floor((target-joined)/(1000*60*60*24))
-  return diffDays>=0 && diffDays<trialDays
+  if(!sheetFee.joined_at) return false
+  // sheetDate（当日）が入店日以降 かつ 出勤日数が体験日数未満
+  if(sheetDate<sheetFee.joined_at) return false
+  return trialWorkDays<=trialDays
 }
 function getShimeiBack(type){
   const trial=isTrialPeriod()
