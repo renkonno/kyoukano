@@ -1134,48 +1134,42 @@ function startApp(){
     document.querySelector('.owner-tab').classList.add('on')
     const ownerTabs=['owner-shift','today','owner-salary','owner-cast','owner-customer','owner-monthly']
     tab(savedTab&&ownerTabs.includes(savedTab)?savedTab:'owner-shift');
-    // オーナー用Push通知ボタン（デバイスIDをDBで管理）
+    // オーナー用Push通知（ログイン時に自動でSubscriptionをDBと同期）
     ;(async function() {
       try {
-        // デバイスごとのユニークIDをlocalStorageで管理
-        let deviceId = localStorage.getItem('kyoukano_device_id');
-        if (!deviceId) {
-          deviceId = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-          localStorage.setItem('kyoukano_device_id', deviceId);
-        }
-
-        // このデバイスIDがDBに登録済みか確認
-        const { data: existingDev } = await sb.from('push_subscriptions').select('id').eq('cast_id', 0).eq('device_id', deviceId).maybeSingle();
-        if (existingDev) return; // 登録済み → ボタン非表示
-      } catch(e) { console.warn('[Push] デバイス確認エラー:', e); }
-
-      const pushBtn = document.createElement('button');
-      pushBtn.textContent = '🔔 通知を有効にする';
-      pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
-      pushBtn.onclick = async function() {
-        // PWAモードかチェック（Safariブラウザでは通知登録できない）
-        const isPWA = window.navigator.standalone === true;
-        if (!isPWA) {
-          alert('通知を有効にするには
-ホーム画面に追加してから
-アプリとして開いてください。');
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        const reg = await navigator.serviceWorker.register('/kyoukano/sw.js?v=7');
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          // 未登録 → ボタンを表示して許可を促す
+          const pushBtn = document.createElement('button');
+          pushBtn.textContent = '🔔 通知を有効にする';
+          pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
+          pushBtn.onclick = async function() {
+            pushBtn.remove();
+            try {
+              const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array('BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E') });
+              const sJson = s.toJSON();
+              // endpointで重複チェックしてから登録
+              const { data: allSubs } = await sb.from('push_subscriptions').select('subscription').eq('cast_id', 0);
+              const exists = (allSubs||[]).some(r=>{ try{return JSON.parse(r.subscription).endpoint===sJson.endpoint}catch{return false} });
+              if (!exists) await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: sJson });
+              alert('Push登録成功！');
+            } catch(e) { alert('Pushエラー: ' + e.name + ' / ' + e.message); }
+          };
           document.body.appendChild(pushBtn);
-          return;
+        } else {
+          // Subscription取得済み → endpointがDBにあるか確認して自動同期
+          const endpoint = sub.endpoint;
+          const { data: allSubs } = await sb.from('push_subscriptions').select('subscription').eq('cast_id', 0);
+          const exists = (allSubs||[]).some(r=>{ try{return JSON.parse(r.subscription).endpoint===endpoint}catch{return false} });
+          if (!exists) {
+            // DBに未登録 → 自動登録（ボタン不要）
+            await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: sub.toJSON() });
+          }
+          // 登録済み or 自動登録完了 → ボタン非表示
         }
-        pushBtn.remove();
-        try {
-          const deviceId = localStorage.getItem('kyoukano_device_id');
-          const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=7");
-          const oldSub = await reg.pushManager.getSubscription();
-          if (oldSub) await oldSub.unsubscribe();
-          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E") });
-          const subJson = sub.toJSON();
-          const { error } = await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: subJson, device_id: deviceId });
-          if (error) { alert('登録失敗: ' + JSON.stringify(error)); return; }
-          alert('Push登録成功！');
-        } catch(e) { alert('Pushエラー: ' + e.name + ' / ' + e.message); }
-      };
-      document.body.appendChild(pushBtn);
+      } catch(e) { console.warn('[Push] オーナー通知エラー:', e); }
     })();
   } else {
     document.querySelector('.cast-tab').classList.add('on')
