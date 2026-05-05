@@ -1153,6 +1153,15 @@ function startApp(){
       pushBtn.textContent = '🔔 通知を有効にする';
       pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
       pushBtn.onclick = async function() {
+        // PWAモードかチェック（Safariブラウザでは通知登録できない）
+        const isPWA = window.navigator.standalone === true;
+        if (!isPWA) {
+          alert('通知を有効にするには
+ホーム画面に追加してから
+アプリとして開いてください。');
+          document.body.appendChild(pushBtn);
+          return;
+        }
         pushBtn.remove();
         try {
           const deviceId = localStorage.getItem('kyoukano_device_id');
@@ -1190,6 +1199,13 @@ function startApp(){
       pushBtn.textContent = '🔔 通知を有効にする';
       pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
       pushBtn.onclick = async function() {
+        const isPWA = window.navigator.standalone === true;
+        if (!isPWA) {
+          alert('通知を有効にするには
+ホーム画面に追加してから
+アプリとして開いてください。');
+          return;
+        }
         pushBtn.remove();
         const castId = me.id;
         try {
