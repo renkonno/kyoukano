@@ -1134,10 +1134,20 @@ function startApp(){
     document.querySelector('.owner-tab').classList.add('on')
     const ownerTabs=['owner-shift','today','owner-salary','owner-cast','owner-customer','owner-monthly']
     tab(savedTab&&ownerTabs.includes(savedTab)?savedTab:'owner-shift');
-    // オーナー用Push通知ボタン（localStorageで登録済み管理）
+    // オーナー用Push通知ボタン（デバイスIDをDBで管理）
     ;(async function() {
-      // localStorageに登録済みフラグがあればボタン非表示
-      if (localStorage.getItem('owner_push_registered') === '1') return;
+      try {
+        // デバイスごとのユニークIDをlocalStorageで管理
+        let deviceId = localStorage.getItem('kyoukano_device_id');
+        if (!deviceId) {
+          deviceId = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+          localStorage.setItem('kyoukano_device_id', deviceId);
+        }
+
+        // このデバイスIDがDBに登録済みか確認
+        const { data: existingDev } = await sb.from('push_subscriptions').select('id').eq('cast_id', 0).eq('device_id', deviceId).maybeSingle();
+        if (existingDev) return; // 登録済み → ボタン非表示
+      } catch(e) { console.warn('[Push] デバイス確認エラー:', e); }
 
       const pushBtn = document.createElement('button');
       pushBtn.textContent = '🔔 通知を有効にする';
@@ -1145,19 +1155,16 @@ function startApp(){
       pushBtn.onclick = async function() {
         pushBtn.remove();
         try {
+          const deviceId = localStorage.getItem('kyoukano_device_id');
           const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=7");
           const oldSub = await reg.pushManager.getSubscription();
           if (oldSub) await oldSub.unsubscribe();
           const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E") });
           const subJson = sub.toJSON();
-          // この端末のcast_id=0レコードを更新
-          await sb.from("push_subscriptions").delete().eq("cast_id", 0);
-          const { error } = await sb.from("push_subscriptions").insert({ cast_id: 0, subscription: subJson });
-          if (error) { alert("登録失敗: " + JSON.stringify(error)); return; }
-          // 登録済みフラグをlocalStorageに保存
-          localStorage.setItem('owner_push_registered', '1');
-          alert("Push登録成功！");
-        } catch(e) { alert("Pushエラー: " + e.name + " / " + e.message); }
+          const { error } = await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: subJson, device_id: deviceId });
+          if (error) { alert('登録失敗: ' + JSON.stringify(error)); return; }
+          alert('Push登録成功！');
+        } catch(e) { alert('Pushエラー: ' + e.name + ' / ' + e.message); }
       };
       document.body.appendChild(pushBtn);
     })();
