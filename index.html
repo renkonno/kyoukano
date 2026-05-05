@@ -1102,7 +1102,31 @@ function startApp(){
   if(me.is_owner){
     document.querySelector('.owner-tab').classList.add('on')
     const ownerTabs=['owner-shift','today','owner-salary','owner-cast','owner-customer','owner-monthly']
-    tab(savedTab&&ownerTabs.includes(savedTab)?savedTab:'owner-shift')
+    tab(savedTab&&ownerTabs.includes(savedTab)?savedTab:'owner-shift');
+    // オーナー用Push通知ボタン（登録済みの場合は非表示）
+    ;(async function() {
+      try {
+        const { data: dbSub } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", 0).maybeSingle();
+        if (dbSub) return;
+      } catch(e) { console.warn('[Push] DB確認エラー:', e); }
+      const pushBtn = document.createElement('button');
+      pushBtn.textContent = '🔔 通知を有効にする';
+      pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
+      pushBtn.onclick = async function() {
+        pushBtn.remove();
+        try {
+          const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=5");
+          const oldSub = await reg.pushManager.getSubscription();
+          if (oldSub) await oldSub.unsubscribe();
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E") });
+          const subJson = sub.toJSON();
+          await sb.from("push_subscriptions").delete().eq("cast_id", 0);
+          const { error } = await sb.from("push_subscriptions").insert({ cast_id: 0, subscription: subJson });
+          if (error) { alert("登録失敗: " + JSON.stringify(error)); } else { alert("Push登録成功！"); }
+        } catch(e) { alert("Pushエラー: " + e.name + " / " + e.message); }
+      };
+      document.body.appendChild(pushBtn);
+    })();
   } else {
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
@@ -1389,6 +1413,13 @@ async function submitShift(){
   if(existing){const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error}
   else{const r=await sb.from('shifts').insert(payload);err=r.error}
   if(err){toast('保存エラー: '+(err.message||JSON.stringify(err)));console.error('saveWork error:',err);return}
+  // オーナーへPush通知
+  try {
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cast_id:0, title:'シフトが提出されました📅', body:me.name+'さんが'+selectedDate+'のシフトを申請しました。'})
+    });
+  } catch(e) { console.error('通知エラー',e); }
   toast('申請しました！')
   closeSheet('shift-req')
   selectedDate=null; loadCal()
@@ -2088,6 +2119,13 @@ async function saveCastMemo(){
     visit_date:today()
   })
   if(error){toast('エラー: '+error.message);return}
+  // オーナーへPush通知
+  try {
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cast_id:0, title:'接客メモが保存されました📝', body:me.name+'さんが接客メモを入力しました。'})
+    });
+  } catch(e) { console.error('通知エラー',e); }
   toast('メモを保存しました')
   closeSheet('cast-memo')
   if(currentCustomerId===castMemoCustomerId)openCustomerDetail(castMemoCustomerId)
@@ -4231,6 +4269,13 @@ async function saveWork(){
   }
   btn.disabled=false;btn.textContent='保存する'
   if(err){toast('保存エラー: '+(err.message||JSON.stringify(err)));console.error('saveWork error:',err);return}
+  // キャストへPush通知
+  try {
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cast_id:sheetCastId, title:'委託金が入力されました💴', body:sheetDate+'の委託金が確定しました。'})
+    });
+  } catch(e) { console.error('通知エラー',e); }
   toast('保存しました！');closeSheet('work')
 }
 
