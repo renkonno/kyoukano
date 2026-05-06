@@ -1613,25 +1613,25 @@ async function loadCastToday() {
   try {
     const today = bizDay();
     // 自分の今日承認済みシフトを取得
-    const { data: shifts } = await sb.from('shifts')
+    const { data: shifts, error: shiftErr } = await sb.from('shifts')
       .select('id,checkin,checkout')
       .eq('cast_id', me.id)
       .eq('date', today)
       .eq('status', 'approved');
 
-    if (!shifts || shifts.length === 0) {
-      area.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の承認済みシフトがありません</div>';
+    if (shiftErr || !shifts || shifts.length === 0) {
+      area.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の承認済みシフトがありません<br><small>日付:' + today + ' cast_id:' + me.id + (shiftErr?' err:'+shiftErr.message:'') + '</small></div>';
       return;
     }
 
     const sids = shifts.map(s => s.id);
-    const { data: rvs } = await sb.from('reservations')
+    const { data: rvs, error: rvErr } = await sb.from('reservations')
       .select('*')
       .in('shift_id', sids)
       .order('checkin_time');
 
-    if (!rvs || rvs.length === 0) {
-      area.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の予約はまだありません</div>';
+    if (rvErr || !rvs || rvs.length === 0) {
+      area.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の予約はまだありません<br><small>shift_ids:' + JSON.stringify(sids) + (rvErr?' err:'+rvErr.message:'') + '</small></div>';
       // 定期リフレッシュ
       clearTimeout(castTodayTimer);
       castTodayTimer = setTimeout(loadCastToday, 60000);
