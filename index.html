@@ -1173,7 +1173,8 @@ function startApp(){
             alert('通知が許可されませんでした。\niPhone設定 → 通知 → アプリ名 から許可してください。');
             return;
           }
-          const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=9");
+          // register()ではなくreadyを使う（SW_UPDATEDによるリロードを防ぐ）
+          const reg = await navigator.serviceWorker.ready;
           const oldSub = await reg.pushManager.getSubscription();
           if (oldSub) await oldSub.unsubscribe();
           const sub = await reg.pushManager.subscribe({
@@ -1214,22 +1215,17 @@ async function checkOwnerPushBtn(){
 
 async function registerOwnerPush(){
   try {
-    // デバッグ情報
-    const dbgSW = 'serviceWorker' in navigator;
-    const dbgPM = 'PushManager' in window;
-    const dbgPerm = Notification.permission;
-    const dbgPWA = window.navigator.standalone;
-    alert('[DEBUG]\nSW:' + dbgSW + '\nPushManager:' + dbgPM + '\npermission:' + dbgPerm + '\nstandalone:' + dbgPWA);
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       alert('このブラウザはPush通知に対応していません。\nホーム画面に追加してPWAとして開いてください。'); return;
     }
-    // 通知許可ダイアログを明示的に表示
+    // 通知許可（既にgrantedなら何も起きない）
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       alert('通知が許可されませんでした。\niPhone設定 → 通知 → アプリ名 から許可してください。');
       return;
     }
-    const reg = await navigator.serviceWorker.register('/kyoukano/sw.js?v=9');
+    // register()ではなくreadyを使う（SW_UPDATEDによるリロードを防ぐ）
+    const reg = await navigator.serviceWorker.ready;
     const oldSub = await reg.pushManager.getSubscription();
     if (oldSub) await oldSub.unsubscribe();
     const sub = await reg.pushManager.subscribe({
