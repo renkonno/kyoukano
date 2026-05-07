@@ -1028,6 +1028,28 @@ function closeSheet(id){
 }
 
 // ── ログイン ──
+async function autoOwnerPasskeyLogin(){
+  if(!window.PublicKeyCredential) return
+  const{data:pk}=await sb.from('passkeys').select('*').eq('cast_id',0).maybeSingle()
+  if(!pk) return // 未登録ならPIN入力に任せる
+  try {
+    const challenge = crypto.getRandomValues(new Uint8Array(32))
+    await navigator.credentials.get({
+      publicKey:{
+        challenge,
+        allowCredentials:[{ type:'public-key', id: b64ToBuf(pk.credential_id) }],
+        userVerification:'required',
+        timeout:60000
+      }
+    })
+    me={id:0,name:'店舗',is_owner:true}
+    sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+    startApp()
+  } catch(e){
+    // キャンセル時はPIN入力に任せる
+  }
+}
+
 async function ownerPasskeyLogin(){
   const btn = document.getElementById('btn-owner-passkey')
   btn.disabled=true; btn.textContent='認証中...'
@@ -1063,7 +1085,7 @@ async function checkOwnerPasskeyBtn(){
 function showLogin(type){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
   if(type==='top') document.getElementById('s-top').classList.add('on')
-  else if(type==='owner'){ document.getElementById('s-owner-login').classList.add('on'); checkOwnerPasskeyBtn() }
+  else if(type==='owner'){ document.getElementById('s-owner-login').classList.add('on'); checkOwnerPasskeyBtn(); setTimeout(autoOwnerPasskeyLogin, 300) }
   else if(type==='cast') document.getElementById('s-cast-login').classList.add('on')
 }
 
@@ -1125,6 +1147,33 @@ async function checkPasskeyBtn(castId){
 }
 
 // 生体認証でログイン
+async function autoPasskeyLogin(castId){
+  if(!window.PublicKeyCredential) return
+  const{data:pk}=await sb.from('passkeys').select('*').eq('cast_id',castId).maybeSingle()
+  if(!pk) return // 未登録ならPIN入力に任せる
+  try {
+    const challenge = crypto.getRandomValues(new Uint8Array(32))
+    const assertion = await navigator.credentials.get({
+      publicKey:{
+        challenge,
+        allowCredentials:[{ type:'public-key', id: b64ToBuf(pk.credential_id) }],
+        userVerification:'required',
+        timeout:60000
+      }
+    })
+    const{data:c}=await sb.from('casts').select('*').eq('id',castId).single()
+    if(!c) throw new Error('ユーザー情報取得失敗')
+    me={...c,is_owner:false}
+    sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+    startApp()
+  } catch(e){
+    // キャンセル・失敗時はPIN入力に戻る（エラー表示しない）
+    if(e.name !== 'NotAllowedError'){
+      document.getElementById('cast-err').textContent = '生体認証失敗。PINでログインしてください。'
+    }
+  }
+}
+
 async function passkeyLogin(){
   const cid = document.getElementById('cast-sel').value
   if(!cid){ document.getElementById('cast-err').textContent='名前を選んでください'; return }
@@ -1230,6 +1279,8 @@ function selectCastCard(castId, castName){
   document.getElementById('cast-pin')?.focus()
   document.getElementById('cast-err').textContent=''
   checkPasskeyBtn(castId)
+  // 登録済みなら自動で生体認証を起動
+  autoPasskeyLogin(castId)
 }
 
 function clearCastSelection(){
