@@ -289,6 +289,7 @@ if("serviceWorker" in navigator){
     <label class="lbl">オーナーPIN（最大8桁）</label>
     <input class="linput" type="password" id="owner-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
     <button class="btn-login" style="background:var(--accent)" onclick="doOwnerLogin()" id="btn-owner">ログイン</button>
+    <button class="btn-login" id="btn-owner-passkey" style="display:none;background:#3a3a3c;margin-top:.5rem" onclick="ownerPasskeyLogin()">🔐 顔認証・指紋認証でログイン</button>
     <div class="lerr" id="owner-err"></div>
   </div>
 </div>
@@ -1027,10 +1028,42 @@ function closeSheet(id){
 }
 
 // ── ログイン ──
+async function ownerPasskeyLogin(){
+  const btn = document.getElementById('btn-owner-passkey')
+  btn.disabled=true; btn.textContent='認証中...'
+  try {
+    const{data:pk}=await sb.from('passkeys').select('*').eq('cast_id',0).single()
+    if(!pk){ throw new Error('登録済みの認証情報がありません') }
+    const challenge = crypto.getRandomValues(new Uint8Array(32))
+    await navigator.credentials.get({
+      publicKey:{
+        challenge,
+        allowCredentials:[{ type:'public-key', id: b64ToBuf(pk.credential_id) }],
+        userVerification:'required',
+        timeout:60000
+      }
+    })
+    me={id:0,name:'店舗',is_owner:true}
+    sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+    startApp()
+  } catch(e){
+    document.getElementById('owner-err').textContent = e.name==='NotAllowedError' ? '認証がキャンセルされました' : '認証失敗: '+e.message
+  } finally {
+    btn.disabled=false; btn.textContent='🔐 顔認証・指紋認証でログイン'
+  }
+}
+
+async function checkOwnerPasskeyBtn(){
+  const btn = document.getElementById('btn-owner-passkey')
+  if(!btn||!window.PublicKeyCredential) return
+  const{data}=await sb.from('passkeys').select('id').eq('cast_id',0).maybeSingle()
+  btn.style.display = data ? '' : 'none'
+}
+
 function showLogin(type){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
   if(type==='top') document.getElementById('s-top').classList.add('on')
-  else if(type==='owner') document.getElementById('s-owner-login').classList.add('on')
+  else if(type==='owner'){ document.getElementById('s-owner-login').classList.add('on'); checkOwnerPasskeyBtn() }
   else if(type==='cast') document.getElementById('s-cast-login').classList.add('on')
 }
 
@@ -1178,6 +1211,7 @@ async function doOwnerLogin(){
   me={id:0,name:'店舗',is_owner:true}
   sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
   startApp()
+  setTimeout(()=>offerPasskeyRegistration(0,'店舗'), 800)
 }
 
 function selectCastCard(castId, castName){
