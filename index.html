@@ -288,8 +288,8 @@ if("serviceWorker" in navigator){
     <div class="login-sub">店舗ログイン</div>
     <label class="lbl">オーナーPIN（最大8桁）</label>
     <input class="linput" type="password" id="owner-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
-    <button class="btn-login" style="background:var(--accent)" onclick="doOwnerLogin()" id="btn-owner">ログイン</button>
-    <button class="btn-login" id="btn-owner-passkey" style="display:none;background:#3a3a3c;margin-top:.5rem" onclick="ownerPasskeyLogin()">🔐 顔認証・指紋認証でログイン</button>
+    <button class="btn-login" style="background:var(--accent)" onclick="doOwnerLoginSmart()" id="btn-owner">ログイン</button>
+    <button class="btn-login" id="btn-owner-passkey" style="display:none" onclick="ownerPasskeyLogin()">🔐 顔認証・指紋認証でログイン</button>
     <div class="lerr" id="owner-err"></div>
   </div>
 </div>
@@ -313,8 +313,8 @@ if("serviceWorker" in navigator){
       </div>
       <label class="lbl">PIN（最大8桁）</label>
       <input class="linput" type="password" id="cast-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key='Enter')doCastLogin()">
-      <button class="btn-login" style="background:linear-gradient(135deg,#b8893a,#d4a855)" onclick="doCastLogin()" id="btn-cast">ログイン</button>
-      <button class="btn-login" id="btn-passkey" style="display:none;background:#3a3a3c;margin-top:.5rem" onclick="passkeyLogin()">🔐 顔認証・指紋認証でログイン</button>
+      <button class="btn-login" style="background:linear-gradient(135deg,#b8893a,#d4a855)" onclick="doCastLoginSmart()" id="btn-cast">ログイン</button>
+      <button class="btn-login" id="btn-passkey" style="display:none" onclick="passkeyLogin()">🔐 顔認証・指紋認証でログイン</button>
     </div>
     <div class="lerr" id="cast-err"></div>
   </div>
@@ -1260,6 +1260,68 @@ async function offerPasskeyRegistration(castId, castName){
   } catch(e){
     if(e.name!=='NotAllowedError') toast('登録失敗: '+e.message)
   }
+}
+
+// ログインボタン押下時：生体認証が使えれば使う、なければPIN認証
+async function doOwnerLoginSmart(){
+  const localKey = 'passkey_registered_0'
+  if(window.PublicKeyCredential && localStorage.getItem(localKey)==='1'){
+    // 生体認証を試みる
+    const{data:pks}=await sb.from('passkeys').select('*').eq('cast_id',0)
+    if(pks&&pks.length>0){
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32))
+        await navigator.credentials.get({
+          publicKey:{
+            challenge,
+            allowCredentials: pks.map(pk=>({type:'public-key', id:b64ToBuf(pk.credential_id)})),
+            userVerification:'required',
+            timeout:60000
+          }
+        })
+        me={id:0,name:'店舗',is_owner:true}
+        sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+        startApp()
+        return
+      } catch(e){
+        if(e.name==='NotAllowedError') return // キャンセル
+        // 失敗したらPIN認証にフォールバック
+      }
+    }
+  }
+  doOwnerLogin()
+}
+
+async function doCastLoginSmart(){
+  const cid = document.getElementById('cast-sel').value
+  if(!cid){ document.getElementById('cast-err').textContent='名前を選んでください'; return }
+  const localKey = 'passkey_registered_' + cid
+  if(window.PublicKeyCredential && localStorage.getItem(localKey)==='1'){
+    const{data:pk}=await sb.from('passkeys').select('*').eq('cast_id',cid).maybeSingle()
+    if(pk){
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32))
+        await navigator.credentials.get({
+          publicKey:{
+            challenge,
+            allowCredentials:[{type:'public-key', id:b64ToBuf(pk.credential_id)}],
+            userVerification:'required',
+            timeout:60000
+          }
+        })
+        const{data:c}=await sb.from('casts').select('*').eq('id',cid).single()
+        if(!c) throw new Error('ユーザー情報取得失敗')
+        me={...c,is_owner:false}
+        sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+        startApp()
+        return
+      } catch(e){
+        if(e.name==='NotAllowedError') return // キャンセル
+        // 失敗したらPIN認証にフォールバック
+      }
+    }
+  }
+  doCastLogin()
 }
 
 async function doOwnerLogin(){
