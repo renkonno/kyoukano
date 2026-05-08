@@ -1216,9 +1216,34 @@ async function passkeyLogin(){
 // PINログイン後に生体認証登録を促す
 async function offerPasskeyRegistration(castId, castName){
   if(!window.PublicKeyCredential) return
-  // 既に登録済みならスキップ
-  const{data:existing}=await sb.from('passkeys').select('id').eq('cast_id',castId).maybeSingle()
-  if(existing) return
+  // この端末のcredential_idがDBにあるか確認
+  try {
+    const reg = await navigator.serviceWorker.ready
+    // まずこの端末にパスキーがあるか確認
+    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(()=>false)
+    if(!available) return
+    // DBの全credential_idを取得してgetで確認
+    const{data:pks}=await sb.from('passkeys').select('credential_id').eq('cast_id',castId)
+    if(pks&&pks.length>0){
+      // この端末のパスキーがDBにあるか確認
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32))
+        await navigator.credentials.get({
+          publicKey:{
+            challenge,
+            allowCredentials: pks.map(pk=>({type:'public-key', id:b64ToBuf(pk.credential_id)})),
+            userVerification:'required',
+            timeout:3000
+          }
+        })
+        // 認証成功 = この端末は登録済み → スキップ
+        return
+      } catch(e){
+        // NotAllowedError = キャンセル、その他 = この端末未登録 → 登録へ進む
+        if(e.name==='NotAllowedError') return
+      }
+    }
+  } catch(e){ console.warn('passkey check:', e) }
 
   if(!confirm('顔認証・指紋認証でログインできるように設定しますか？\n次回から素早くログインできます。')) return
 
