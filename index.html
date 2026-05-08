@@ -6661,12 +6661,12 @@ function renderMonthlyDaily(area,dailyRows,tot){
     html+=C(Ns(r.profit),'#1565c0',true)
     html+=C(cashNeg?'▲'+N(r.cashRemain):Ns(r.cashRemain),cashNeg?'#c62828':'#1565c0')
     html+=C(avgUnit>0?Ns(avgUnit):'—')
-    html+=C(r.attendance||0)
-    html+=C(r.free||0)
-    html+=C(r.net_shimei||0)
-    html+=C(r.hon_shimei||0)
-    html+=C(r.count||0)
-    html+=C(r.inquiry>0?Ns(r.inquiry):'—',r.inquiry>0?'':'#ccc')
+    html+=CB(r.attendance||0)
+    html+=CB(r.free||0)
+    html+=CB(r.net_shimei||0)
+    html+=CB(r.hon_shimei||0)
+    html+=CB(r.count||0)
+    html+=CB(r.inquiry>0?Ns(r.inquiry):'—',r.inquiry>0?'':'#ccc')
     html+='</tr>'
 
     // キャスト内訳行（同じ <tbody> 内に直接展開→列が揃う）
@@ -6708,7 +6708,12 @@ function renderMonthlyDaily(area,dailyRows,tot){
     ${[Ns(tot.gross),tot.disc>0?'-'+Ns(tot.disc):'—',Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
        totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),tot.count>0?Ns(Math.round(tot.gross_work/tot.count)):'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
-      .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===1?';color:#c62828':i===5?';color:#c62828':i===6?';color:#c62828':i===7&&totAdv?';color:#c62828':i===8?';color:#1565c0':i===9?';color:'+(totCashNeg?'#c62828':'#1565c0'):''}">${v}</td>`).join('')}
+      .map((v,i)=>{
+        const isCount=i>=11
+        const color=i===1?';color:#c62828':i===5?';color:#c62828':i===6?';color:#c62828':i===7&&totAdv?';color:#c62828':i===8?';color:#1565c0':i===9?';color:'+(totCashNeg?'#c62828':'#1565c0'):''
+        const w=isCount?'24px':'50px'
+        return `<td style="text-align:center;padding:.2rem ${isCount?'.04rem':'.06rem'};font-size:.63rem;font-weight:700${color}"><div style="background:var(--surface);border-radius:4px;padding:.18rem .1rem;width:${w};margin:0 auto;box-sizing:border-box">${v}</div></td>`
+      }).join('')}
   </tr>`
 
   const legend=`<div style="display:flex;gap:.7rem;font-size:.6rem;color:var(--text3);margin-bottom:.35rem;flex-wrap:wrap;align-items:center">
