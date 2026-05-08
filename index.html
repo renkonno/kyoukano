@@ -5379,6 +5379,34 @@ async function deleteWork(id){
 }
 
 // ── 店舗料金設定 ──
+async function loadGlobalData(){
+  const{data:cs}=await sb.from('courses').select('*').order('price')
+  const{data:op}=await sb.from('options').select('*').order('id')
+  courses=cs||[]; opts=op||[]
+  // キャスト予約入力のコース・オプション選択肢を更新
+  refreshCourseOptSelects()
+}
+
+function refreshCourseOptSelects(){
+  // 予約入力のコース選択を更新
+  const courseSelects = document.querySelectorAll('#rv-course, #rve-course, #course-sel')
+  courseSelects.forEach(sel=>{
+    if(!sel) return
+    const cur = sel.value
+    sel.innerHTML = courses.map(c=>`<option value="${c.name}">${c.name}（¥${c.price?.toLocaleString()}）</option>`).join('')
+    if(cur) sel.value = cur
+  })
+  // 予約入力のオプション選択を更新
+  const optAreas = document.querySelectorAll('#rv-options-list, #rve-options-list')
+  optAreas.forEach(area=>{
+    if(!area) return
+    area.innerHTML = opts.map(o=>`
+      <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border)">
+        <input type="checkbox" class="rv-opt-chk" value="${o.name}"> ${o.name}（¥${o.price?.toLocaleString()}）
+      </label>`).join('')
+  })
+}
+
 async function openStoreSettings(){
   document.querySelectorAll('.overlay.on').forEach(el=>el.classList.remove('on'))
   await loadStoreDiscList()
