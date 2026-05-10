@@ -7031,7 +7031,8 @@ function renderMonthlyExpense(area,sd,fmt2,total_ad,total_rent,total_util,total_
 
 function drawDailyBarChart(canvasId,labels,sales,nets,profits){
   const canvas=document.getElementById(canvasId); if(!canvas)return
-  const W=canvas.parentElement.offsetWidth||300
+  const area=document.getElementById('monthly-area')
+  const W=Math.max(canvas.parentElement?.offsetWidth||0,area?.offsetWidth||0,300)-16
   const barCount=labels.length, groupW=Math.max(Math.floor((W-40)/Math.max(barCount,1)),4)
   const bW=Math.max(Math.floor(groupW/4),2), gap=1
   const H=220; canvas.width=W; canvas.height=H
@@ -7072,7 +7073,8 @@ function drawDailyBarChart(canvasId,labels,sales,nets,profits){
 
 function drawDailyLineChart(canvasId,labels,counts){
   const canvas=document.getElementById(canvasId); if(!canvas)return
-  const W=canvas.parentElement.offsetWidth||300
+  const area=document.getElementById('monthly-area')
+  const W=Math.max(canvas.parentElement?.offsetWidth||0,area?.offsetWidth||0,300)-16
   const H=160; canvas.width=W; canvas.height=H
   const ctx=canvas.getContext('2d')
   const maxV=Math.max(...counts,1)
@@ -7165,18 +7167,15 @@ function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total
 
   area.innerHTML=dailyChartHtml+pie('chart-route',routeData,routeColors,'📣 集客経路')+pie('chart-shimei',shimeiData,shimeiColors,'👆 指名内訳')+pie('chart-visit',visitData,visitColors,'👥 来店分類')
   
-  requestAnimationFrame(()=>{
-    // 日別棒グラフ
+  setTimeout(()=>{
     if(vr.length){
-      // 日別棒グラフ（独自Canvas描画）
       drawDailyBarChart('chart-daily-bar',labels,salesData,netData,profitData)
-      // 日別本数折れ線グラフ
       drawDailyLineChart('chart-daily-line',labels,countData)
     }
     if(routeData.length) drawPieChart('chart-route',routeData,routeColors)
     if(shimeiData.length) drawPieChart('chart-shimei',shimeiData,shimeiColors)
     if(visitData.length) drawPieChart('chart-visit',visitData,visitColors)
-  })
+  },50)
 }
 
 async function openMonthlySalesEdit(){
