@@ -2119,7 +2119,7 @@ async function castOpenCustHistory(customerNo, custName, directCustId) {
 
   // 来店履歴取得
   const{data:visits,error:vErr}=await sb.from('customer_visits')
-    .select('visit_date,course,cast_name,total_price,shimei_type,options')
+    .select('visit_date,course,cast_name,shimei_type,options')
     .eq('customer_id',custId)
     .order('visit_date',{ascending:false})
     .limit(30)
