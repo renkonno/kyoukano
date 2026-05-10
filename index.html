@@ -1423,12 +1423,32 @@ function startApp(){
       if (!btn) return;
       try {
         const permission = Notification.permission;
-        const { data: dbSub } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
-        if (dbSub && permission === "granted") {
+        const { data: dbSub } = await sb.from("push_subscriptions").select("cast_id,subscription").eq("cast_id", castId).maybeSingle();
+        // ブラウザ側のサブスクリプションも確認
+        const reg = await navigator.serviceWorker.ready;
+        const browserSub = await reg.pushManager.getSubscription();
+        
+        if (permission === "granted" && browserSub) {
+          // ブラウザにサブスクリプションがある → DBと同期確認
+          const browserEndpoint = browserSub.toJSON().endpoint;
+          const dbEndpoint = dbSub?.subscription?.endpoint;
+          
+          if (!dbSub || browserEndpoint !== dbEndpoint) {
+            // DBと不一致 → 自動で再登録
+            console.log('[Push] DB不一致 → 自動再登録');
+            const subJson = browserSub.toJSON();
+            await sb.from("push_subscriptions").delete().eq("cast_id", castId);
+            await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+          }
           btn.textContent = '✅ 設定済み';
           btn.disabled = true;
           btn.style.opacity = '0.6';
           btn.style.cursor = 'default';
+        } else if (permission === "granted" && !browserSub && dbSub) {
+          // ブラウザにサブスクリプションがないのにDBにある → DBを削除してボタンをリセット
+          console.log('[Push] ブラウザのサブスクリプション消失 → DB削除');
+          await sb.from("push_subscriptions").delete().eq("cast_id", castId);
+          btn.textContent = '🔔 通知設定';
         } else {
           btn.textContent = '🔔 通知設定';
         }
@@ -1464,12 +1484,14 @@ async function registerCastPush(){
       return;
     }
     const reg = await navigator.serviceWorker.ready;
-    const oldSub = await reg.pushManager.getSubscription();
-    if (oldSub) await oldSub.unsubscribe();
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E")
-    });
+    // 既存サブスクリプションを再利用（unsubscribeしない）
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E")
+      });
+    }
     const subJson = sub.toJSON();
     await sb.from("push_subscriptions").delete().eq("cast_id", castId);
     const { error } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
