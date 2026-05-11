@@ -2300,26 +2300,38 @@ async function castAddOption(rvId, custName) {
 }
 
 async function castExtend(rvId, custName) {
-  // 延長シートを表示（分数入力 + 支払い方法選択）
+  // 延長コースを courses から取得（延長を含む名前のもの）
+  const extCourses = courses.filter(c => c.name && c.name.includes('延長'));
+  // フォールバック：延長コースが登録されていなければ30分固定
+  const extOptions = extCourses.length > 0
+    ? extCourses.map(c => {
+        const mins = c.duration || (c.name.match(/(\d+)分/) ? parseInt(c.name.match(/(\d+)分/)[1]) : 30);
+        return { label: c.name, mins };
+      })
+    : [{ label: '30分', mins: 30 }];
+
+  // 延長シートを表示（コースボタン選択 + 支払い方法選択）
+  const extBtns = extOptions.map((opt, i) =>
+    `<button class="ext-time-btn" data-mins="${opt.mins}" data-idx="${i}"
+      style="flex:1;padding:.65rem .3rem;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:.9rem;font-weight:700;cursor:pointer;transition:all .15s">
+      ${opt.label}
+    </button>`
+  ).join('');
+
   const sheet = document.createElement('div');
   sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end';
   sheet.innerHTML = `
     <div style="background:white;width:100%;border-radius:20px 20px 0 0;padding:1.25rem">
       <div style="font-weight:700;font-size:1rem;margin-bottom:.3rem">延長（${custName}さん）</div>
-      <div style="font-size:.75rem;color:var(--text3);margin-bottom:1rem">延長時間と支払い方法を選択してください</div>
-      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:flex-start">
-        <div style="flex:1">
-          <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">延長時間（分）</div>
-          <input id="ext-mins-input" type="number" value="30" min="10" step="10"
-            style="width:100%;padding:.6rem;font-size:1rem;font-weight:700;border:1.5px solid var(--border);border-radius:8px;text-align:center;box-sizing:border-box">
-        </div>
-        <div style="flex:1">
-          <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">支払い方法</div>
-          <select id="ext-pay-sel" style="width:100%;padding:.6rem;font-size:.95rem;border:1.5px solid var(--border);border-radius:8px;background:white;box-sizing:border-box">
-            <option value="現金">💴 現金</option>
-            <option value="カード">💳 カード</option>
-          </select>
-        </div>
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.8rem">延長時間と支払い方法を選択してください</div>
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.4rem">延長時間</div>
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem">${extBtns}</div>
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.4rem">支払い方法</div>
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+        <button class="ext-pay-btn" data-pay="現金"
+          style="flex:1;padding:.65rem;border:1.5px solid var(--accent);border-radius:8px;background:var(--accent);color:white;font-size:.9rem;font-weight:700;cursor:pointer">💴 現金</button>
+        <button class="ext-pay-btn" data-pay="カード"
+          style="flex:1;padding:.65rem;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:.9rem;font-weight:700;cursor:pointer;color:var(--text)">💳 カード</button>
       </div>
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:.75rem;border:1.5px solid var(--border);border-radius:10px;background:white;font-weight:700;cursor:pointer">キャンセル</button>
@@ -2328,10 +2340,35 @@ async function castExtend(rvId, custName) {
     </div>`;
   document.body.appendChild(sheet);
 
+  // 初期選択：最初のコース
+  let selectedMins = extOptions[0].mins;
+  let selectedPay = '現金';
+
+  // 延長時間ボタンのトグル
+  const timeBtns = sheet.querySelectorAll('.ext-time-btn');
+  timeBtns[0].style.cssText += ';background:var(--accent);color:white;border-color:var(--accent)';
+  timeBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      timeBtns.forEach(b => { b.style.background='white'; b.style.color='var(--text)'; b.style.borderColor='var(--border)'; });
+      this.style.background = 'var(--accent)'; this.style.color = 'white'; this.style.borderColor = 'var(--accent)';
+      selectedMins = parseInt(this.dataset.mins);
+    });
+  });
+
+  // 支払いボタンのトグル
+  const payBtns = sheet.querySelectorAll('.ext-pay-btn');
+  payBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      payBtns.forEach(b => { b.style.background='white'; b.style.color='var(--text)'; b.style.borderColor='var(--border)'; });
+      this.style.background = 'var(--accent)'; this.style.color = 'white'; this.style.borderColor = 'var(--accent)';
+      selectedPay = this.dataset.pay;
+    });
+  });
+
   sheet.querySelector('#ext-confirm').onclick = async function() {
-    const extMin = parseInt(sheet.querySelector('#ext-mins-input').value);
-    const extPay = sheet.querySelector('#ext-pay-sel').value;
-    if (!extMin || isNaN(extMin) || extMin <= 0) { alert('延長時間を入力してください'); return; }
+    const extMin = selectedMins;
+    const extPay = selectedPay;
+    if (!extMin || extMin <= 0) { alert('延長時間を選択してください'); return; }
 
     // checkout_timeを延長
     const { data: rv } = await sb.from('reservations').select('checkout_time, extension_count, payment').eq('id', rvId).single();
