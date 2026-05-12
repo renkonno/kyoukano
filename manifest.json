@@ -1,8 +1,10 @@
 {
   "name": "ShiftLink",
   "short_name": "ShiftLink",
-  "description": "共感のSNS",
-  "start_url": "/",  "display": "standalone",
+  "description": "メンズエステ店舗管理・スタッフ勤務管理システム",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#b8893a",
   "icons": [
