@@ -853,6 +853,10 @@ if("serviceWorker" in navigator){
       </div>
     </div>
     <div class="fee-sec">
+      <div class="fee-sec-title">⏱ 延長料金</div>
+      <div id="store-ext-list"></div>
+    </div>
+    <div class="fee-sec">
       <div class="fee-sec-title">👤 指名料金</div>
       <div class="fee-row"><div class="fee-lbl">フリー指名</div><input type="number" class="fee-input" id="st-shimei-free" min="0" step="100"><span class="fee-unit">円</span></div>
       <div class="fee-row"><div class="fee-lbl">ネット指名</div><input type="number" class="fee-input" id="st-shimei-net" min="0" step="100"><span class="fee-unit">円</span></div>
@@ -5953,8 +5957,9 @@ async function openStoreSettings(){
 async function renderStoreCourseList(){
   const{data:cs}=await sb.from('courses').select('*').order('price')
   const el=document.getElementById('store-course-list')
-  if(!el||!cs) return
-  el.innerHTML=cs.map(c=>`
+  const extEl=document.getElementById('store-ext-list')
+  if(!cs) return
+  const rowHtml=c=>`
     <div style="padding:.45rem 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;gap:.35rem;align-items:center;margin-bottom:.3rem">
         <input type="text" class="fee-input" style="flex:1;font-size:.8rem;min-width:0" value="${c.name}" id="cn-${c.id}">
@@ -5967,7 +5972,11 @@ async function renderStoreCourseList(){
         <button onclick="updateStoreCourse(${c.id})" style="padding:.3rem .9rem;border:none;border-radius:6px;background:var(--accent);color:white;font-size:.75rem;cursor:pointer;font-weight:600">保存</button>
         <button onclick="deleteStoreCourse(${c.id})" style="padding:.3rem .9rem;border:none;border-radius:6px;background:var(--red);color:white;font-size:.75rem;cursor:pointer;font-weight:600">削除</button>
       </div>
-    </div>`).join('')
+    </div>`
+  const courses = (cs||[]).filter(c=>!c.name.includes('延長'))
+  const exts = (cs||[]).filter(c=>c.name.includes('延長'))
+  if(el) el.innerHTML=courses.map(rowHtml).join('')
+  if(extEl) extEl.innerHTML=exts.length ? exts.map(rowHtml).join('') : '<div style="font-size:.8rem;color:var(--text3);padding:.3rem 0">延長コースがありません</div>'
 }
 
 async function renderStoreOptionList(){
