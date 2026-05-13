@@ -5955,14 +5955,18 @@ async function renderStoreCourseList(){
   const el=document.getElementById('store-course-list')
   if(!el||!cs) return
   el.innerHTML=cs.map(c=>`
-    <div class="fee-row" style="gap:.4rem">
-      <input type="text" class="fee-input" style="flex:1;font-size:.8rem" value="${c.name}" id="cn-${c.id}">
-      <input type="number" class="fee-input" style="width:80px" value="${c.price}" id="cp-${c.id}" min="0" step="100">
-      <span class="fee-unit">円</span>
-      <input type="number" class="fee-input" style="width:56px" value="${c.duration||''}" id="cd-${c.id}" min="0" step="10" placeholder="分">
-      <span class="fee-unit">分</span>
-      <button onclick="updateStoreCourse(${c.id})" style="padding:.3rem .5rem;border:none;border-radius:6px;background:var(--accent);color:white;font-size:.7rem;cursor:pointer;white-space:nowrap">保存</button>
-      <button onclick="deleteStoreCourse(${c.id})" style="padding:.3rem .5rem;border:none;border-radius:6px;background:var(--red);color:white;font-size:.7rem;cursor:pointer">削除</button>
+    <div style="padding:.45rem 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:.35rem;align-items:center;margin-bottom:.3rem">
+        <input type="text" class="fee-input" style="flex:1;font-size:.8rem;min-width:0" value="${c.name}" id="cn-${c.id}">
+        <input type="number" class="fee-input" style="width:74px" value="${c.price}" id="cp-${c.id}" min="0" step="100">
+        <span class="fee-unit">円</span>
+        <input type="number" class="fee-input" style="width:52px" value="${c.duration||''}" id="cd-${c.id}" min="0" step="10" placeholder="分">
+        <span class="fee-unit">分</span>
+      </div>
+      <div style="display:flex;gap:.35rem;justify-content:flex-end">
+        <button onclick="updateStoreCourse(${c.id})" style="padding:.3rem .9rem;border:none;border-radius:6px;background:var(--accent);color:white;font-size:.75rem;cursor:pointer;font-weight:600">保存</button>
+        <button onclick="deleteStoreCourse(${c.id})" style="padding:.3rem .9rem;border:none;border-radius:6px;background:var(--red);color:white;font-size:.75rem;cursor:pointer;font-weight:600">削除</button>
+      </div>
     </div>`).join('')
 }
 
@@ -5971,12 +5975,16 @@ async function renderStoreOptionList(){
   const el=document.getElementById('store-option-list')
   if(!el||!ops) return
   el.innerHTML=ops.map(o=>`
-    <div class="fee-row" style="gap:.4rem">
-      <input type="text" class="fee-input" style="flex:1;font-size:.8rem" value="${o.name}" id="on-${o.id}">
-      <input type="number" class="fee-input" style="width:80px" value="${o.price}" id="op-${o.id}" min="0" step="100">
-      <span class="fee-unit">円</span>
-      <button onclick="updateStoreOption(${o.id})" style="padding:.3rem .5rem;border:none;border-radius:6px;background:var(--accent);color:white;font-size:.7rem;cursor:pointer;white-space:nowrap">保存</button>
-      <button onclick="deleteStoreOption(${o.id})" style="padding:.3rem .5rem;border:none;border-radius:6px;background:var(--red);color:white;font-size:.7rem;cursor:pointer">削除</button>
+    <div style="padding:.45rem 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:.35rem;align-items:center;margin-bottom:.3rem">
+        <input type="text" class="fee-input" style="flex:1;font-size:.8rem;min-width:0" value="${o.name}" id="on-${o.id}">
+        <input type="number" class="fee-input" style="width:90px" value="${o.price}" id="op-${o.id}" min="0" step="100">
+        <span class="fee-unit">円</span>
+      </div>
+      <div style="display:flex;gap:.35rem;justify-content:flex-end">
+        <button onclick="updateStoreOption(${o.id})" style="padding:.3rem .9rem;border:none;border-radius:6px;background:var(--accent);color:white;font-size:.75rem;cursor:pointer;font-weight:600">保存</button>
+        <button onclick="deleteStoreOption(${o.id})" style="padding:.3rem .9rem;border:none;border-radius:6px;background:var(--red);color:white;font-size:.75rem;cursor:pointer;font-weight:600">削除</button>
+      </div>
     </div>`).join('')
 }
 
