@@ -1916,11 +1916,21 @@ async function submitShift(){
   const start=document.getElementById('f-start').value
   const end=document.getElementById('f-end').value
   const note=document.getElementById('f-note')?.value||''
-  const existing=myShifts.find(s=>s.date===selectedDate)
+  // キャッシュが古い可能性があるため最新DBを確認
+  const{data:dbShifts}=await sb.from('shifts').select('id,status').eq('cast_id',me.id).eq('date',selectedDate)
+  const existing=dbShifts&&dbShifts.length>0?dbShifts[0]:null
   const payload={cast_id:me.id,date:selectedDate,start_time:start,end_time:end,note,status:'requested'}
   let err
-  if(existing){const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error}
-  else{const r=await sb.from('shifts').insert(payload);err=r.error}
+  if(existing&&existing.status==='rejected'){
+    // 却下済みシフトは削除してから再申請（RLSでUPDATE不可の場合があるため）
+    const{error:delErr}=await sb.from('shifts').delete().eq('id',existing.id)
+    if(delErr){toast('保存エラー: '+(delErr.message||JSON.stringify(delErr)));return}
+    const r=await sb.from('shifts').insert(payload);err=r.error
+  } else if(existing){
+    const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error
+  } else {
+    const r=await sb.from('shifts').insert(payload);err=r.error
+  }
   if(err){
     if(err.code==='23505') toast('この日はすでにシフトが申請されています')
     else toast('保存エラー: '+(err.message||JSON.stringify(err)))
@@ -4249,7 +4259,8 @@ async function confirmRoomAssign(shiftId){
 }
 
 async function approveShift(id){
-  await sb.from('shifts').update({status:'approved'}).eq('id',id);
+  const{error}=await sb.from('shifts').update({status:'approved'}).eq('id',id);
+  if(error){toast('エラー: '+error.message);return}
   toast('承認しました');
   // Push通知送信
   try {
