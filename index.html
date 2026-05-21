@@ -290,7 +290,7 @@ tr:last-child td{border-bottom:none}
 }
 </style>
 <script>
-const SW_VER = 'v12';
+const SW_VER = 'v13';
 const _isSaaS = new URLSearchParams(location.search).has('saas') || location.hostname === 'app.shiftlink.jp';
 if("serviceWorker" in navigator && !_isSaaS){
   // 古いSWをすべて解除してから新しいSWを登録
@@ -315,11 +315,15 @@ if("serviceWorker" in navigator && !_isSaaS){
       navigator.serviceWorker.register("/sw.js?" + SW_VER)
         .then(r=>console.log("[SW] 登録成功:",r))
         .catch(e=>console.error("[SW] 登録失敗:",e));
-      // SW更新時の自動リロード
+      // SW更新時の自動リロード + Push subscription変更通知
       navigator.serviceWorker.addEventListener('message', function(e){
         if(e.data && e.data.type === 'SW_UPDATED'){
           console.log('[SW] 新バージョン検出 → 自動リロード');
           window.location.reload(true);
+        }
+        if(e.data && e.data.type === 'PUSH_SUB_CHANGED' && e.data.subscription){
+          console.log('[SW] Push subscription変更通知 → DB再登録');
+          window._pendingPushSubChange = e.data.subscription;
         }
       });
     });
